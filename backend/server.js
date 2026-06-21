@@ -34,6 +34,13 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Server is running",
+  });
+});
+
 // API: Get all URLs
 app.get('/api/urls', async (req, res) => {
   try {
