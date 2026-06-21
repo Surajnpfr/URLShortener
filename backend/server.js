@@ -183,7 +183,7 @@ app.delete('/api/urls/:id', async (req, res) => {
 });
 
 // Redirect endpoint
-app.get('/:shortCode', async (req, res) => {
+app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   const { shortCode } = req.params;
   try {
     const urlDoc = await Url.findOne({ shortCode });
