@@ -166,6 +166,7 @@ app.get('/:shortCode', async (req, res) => {
   try {
     const urlDoc = await Url.findOne({ shortCode });
     if (!urlDoc) {
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
       return res.status(404).send(`
         <!DOCTYPE html>
         <html>
@@ -185,7 +186,7 @@ app.get('/:shortCode', async (req, res) => {
           <div class="card">
             <h1>404 - Link Not Found</h1>
             <p>The shortened link you are trying to access does not exist or has expired.</p>
-            <a href="http://localhost:5173">Go to URL Shortener</a>
+            <a href="${baseUrl}">Go to URL Shortener</a>
           </div>
         </body>
         </html>

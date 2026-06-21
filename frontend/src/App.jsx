@@ -81,7 +81,7 @@ const InstagramIcon = ({ size = 16, ...props }) => (
   </svg>
 );
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = '';
 
 export default function App() {
   const [urls, setUrls] = useState([]);
@@ -97,7 +97,12 @@ export default function App() {
   // Dynamic Custom Domains List state
   const [domains, setDomains] = useState(() => {
     const local = localStorage.getItem('domains');
-    return local ? JSON.parse(local) : ['linkly.to', 'link.me', 'go.ly'];
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (parsed.includes('hamroniti.com')) return parsed;
+      return ['hamroniti.com', ...parsed.filter(d => d !== 'linkly.to')];
+    }
+    return ['hamroniti.com', 'link.me', 'go.ly'];
   });
 
   // Dynamic Settings Configuration state

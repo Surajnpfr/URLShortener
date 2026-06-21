@@ -2,10 +2,10 @@ import { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Link2, Sparkles, Copy, Check, QrCode, AlertCircle } from 'lucide-react';
 
-export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['linkly.to'], settings = { redirectType: 302, shortCodeLength: 6 } }) {
+export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['hamroniti.com'], settings = { redirectType: 302, shortCodeLength: 6 } }) {
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
-  const [domain, setDomain] = useState('linkly.to');
+  const [domain, setDomain] = useState(domains[0] || 'hamroniti.com');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);

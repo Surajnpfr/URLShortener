@@ -39,3 +39,11 @@ Thumbs.db
 .gemini/
 .antigravity/
 .system_generated/
+
+# Database dumps and local data storage
+data/
+db/
+dump/
+*.db
+*.sqlite
+
