@@ -12,11 +12,26 @@ const PORT = process.env.PORT || 5000;
 // Connect Database
 await connectDB();
 
-// Middleware
+// ==========================================
+// 1. MIDDLEWARES (Correct Production Order)
+// ==========================================
+
+// Trust reverse proxy headers (Railway/Nginx/Cloudflare)
+// Required for correct req.protocol (HTTP vs HTTPS) and IP logging
+app.set('trust proxy', 1);
+
+// Enable CORS for cross-origin frontend requests
 app.use(cors());
+
+// Parse incoming JSON payloads
 app.use(express.json());
 
-// URL shortcode generation helper
+// Parse URL-encoded payloads (useful for form submissions)
+app.use(express.urlencoded({ extended: true }));
+
+// ==========================================
+// 2. HELPER FUNCTIONS
+// ==========================================
 function generateShortCode(length = 6) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let code = '';
@@ -26,7 +41,40 @@ function generateShortCode(length = 6) {
   return code;
 }
 
-// API: Get database mode (for showing on frontend)
+// ==========================================
+// 3. SYSTEM & HEALTH CHECK ROUTES
+// ==========================================
+
+// Health Check Endpoint (returns 200 OK for Railway/Nginx checks)
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'Server is running',
+  });
+});
+
+// Root API Endpoint (indicates the server is up)
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'URL Shortener API Server is running',
+  });
+});
+
+// Early-catch Favicon Endpoint (prevents db queries for favicons)
+app.get('/favicon.ico', (req, res) => {
+  res.status(200).type('image/svg+xml').send(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#eab308">
+      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+    </svg>
+  `);
+});
+
+// ==========================================
+// 4. API ENDPOINTS
+// ==========================================
+
+// GET API Status
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
@@ -34,35 +82,12 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    message: "Server is running",
-  });
-});
-
-app.get("/", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    message: "Server is running",
-  });
-});
-
-app.get("/favicon.ico", (req, res) => {
-  res.status(200).type("image/svg+xml").send(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#eab308">
-      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-    </svg>
-  `);
-});
-
-// API: Get all URLs
+// GET All URLs
 app.get('/api/urls', async (req, res) => {
   try {
     const urls = await Url.find().sort({ createdAt: -1 });
     const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
     
-    // Map response to include the full short URL
     const formattedUrls = urls.map(item => ({
       _id: item._id,
       originalUrl: item.originalUrl,
@@ -79,7 +104,7 @@ app.get('/api/urls', async (req, res) => {
   }
 });
 
-// API: Shorten URL
+// POST Shorten URL
 app.post('/api/shorten', async (req, res) => {
   const { url, customAlias, redirectType, shortCodeLength } = req.body;
 
@@ -87,13 +112,11 @@ app.post('/api/shorten', async (req, res) => {
     return res.status(400).json({ error: 'Original URL is required' });
   }
 
-  // Prepend protocol if missing
   let targetUrl = url.trim();
   if (!/^https?:\/\//i.test(targetUrl)) {
     targetUrl = 'https://' + targetUrl;
   }
 
-  // Validate URL format
   try {
     new URL(targetUrl);
   } catch (err) {
@@ -107,8 +130,6 @@ app.post('/api/shorten', async (req, res) => {
 
     if (customAlias) {
       const alias = customAlias.trim();
-      
-      // Validate alias format (alphanumeric, hyphens, underscores, between 3 and 30 characters)
       const aliasRegex = /^[a-zA-Z0-9-_]{3,30}$/;
       if (!aliasRegex.test(alias)) {
         return res.status(400).json({ 
@@ -116,7 +137,6 @@ app.post('/api/shorten', async (req, res) => {
         });
       }
 
-      // Check if alias already exists
       const existing = await Url.findOne({ shortCode: alias });
       if (existing) {
         return res.status(400).json({ error: 'Custom alias is already taken. Please choose another one.' });
@@ -124,7 +144,6 @@ app.post('/api/shorten', async (req, res) => {
       
       shortCode = alias;
     } else {
-      // Generate unique short code
       let isUnique = false;
       let attempts = 0;
       
@@ -142,7 +161,6 @@ app.post('/api/shorten', async (req, res) => {
       }
     }
 
-    // Save to database
     const newUrl = await Url.create({
       originalUrl: targetUrl,
       shortCode,
@@ -167,7 +185,7 @@ app.post('/api/shorten', async (req, res) => {
   }
 });
 
-// API: Delete shortened URL
+// DELETE URL
 app.delete('/api/urls/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -182,7 +200,11 @@ app.delete('/api/urls/:id', async (req, res) => {
   }
 });
 
-// Redirect endpoint
+// ==========================================
+// 5. REDIRECTION & CATCH-ALL ROUTING
+// ==========================================
+
+// Redirect Endpoint with strict regex check (ignores favicon.ico, etc.)
 app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   const { shortCode } = req.params;
   try {
@@ -215,11 +237,9 @@ app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
       `);
     }
 
-    // Increment click count and save
     urlDoc.clicks = (urlDoc.clicks || 0) + 1;
     await urlDoc.save();
 
-    // Redirect to original URL using the saved redirect status code
     res.redirect(urlDoc.redirectType || 302, urlDoc.originalUrl);
   } catch (error) {
     console.error('Redirection error:', error);
@@ -227,7 +247,33 @@ app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   }
 });
 
-// Start Express Server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+// JSON Fallback 404 for any other unmatched routes
+app.use((req, res) => {
+  res.status(404).json({
+    status: 404,
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.originalUrl}`
+  });
+});
+
+// ==========================================
+// 6. GLOBAL ERROR HANDLING MIDDLEWARE
+// ==========================================
+// Catches all synchronous/asynchronous uncaught exceptions
+// This prevents Express from crashing and returning a 502 Bad Gateway
+app.use((err, req, res, next) => {
+  console.error('🔥 Uncaught Global Exception:', err.stack || err);
+  res.status(500).json({
+    status: 500,
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message
+  });
+});
+
+// ==========================================
+// 7. START SERVER
+// ==========================================
+// Bound to '0.0.0.0' to ensure proper networking in containers/Railway
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Production server running on port ${PORT} (bound to 0.0.0.0)`);
 });
