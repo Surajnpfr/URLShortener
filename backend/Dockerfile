@@ -9,6 +9,6 @@ RUN npm install --production
 # Copy the rest of the backend files
 COPY . .
 
-EXPOSE 5000
+EXPOSE 8080
 
 CMD ["npm", "start"]
