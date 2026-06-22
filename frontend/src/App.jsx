@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { 
-  Link2, Sun, Moon, Database, Sparkles, Check, Shield, BarChart2, 
-  Plus, Lock, Settings, Home, Globe, QrCode, Mail, Key, User, 
+  Link2, Sun, Moon, Sparkles, Check, Shield, BarChart2, 
+  Plus, Settings, Home, Globe, QrCode, Mail, Key, 
   CreditCard, ChevronDown
 } from 'lucide-react';
 import ShortenerForm from './components/ShortenerForm';
 import UrlList from './components/UrlList';
 import QrModal from './components/QrModal';
+import TermsPage from './components/TermsPage';
+import PrivacyPage from './components/PrivacyPage';
 
 // Custom Brand SVGs due to lucide-react brand icons mismatch
 const TwitterIcon = ({ size = 16, ...props }) => (
@@ -86,13 +88,41 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 export default function App() {
   const [urls, setUrls] = useState([]);
   const [dbMode, setDbMode] = useState('MONGODB');
-  const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('theme') || 'light'; // Default to light theme for Linkly look
   });
   
   // Navigation active tab in sidebar
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Client-side router path state
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Synchronize route with history back/forward button navigations
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Shared navigation link scrolling logic
+  const handleNavClick = (e, targetId) => {
+    e.preventDefault();
+    if (currentPath !== '/') {
+      window.history.pushState({}, '', `/#${targetId}`);
+      setCurrentPath('/');
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    } else {
+      const el = document.getElementById(targetId);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
 
   // Dynamic Custom Domains List state
   const [domains, setDomains] = useState(() => {
@@ -103,12 +133,6 @@ export default function App() {
       return ['hamroniti.com', ...parsed.filter(d => d !== 'linkly.to')];
     }
     return ['hamroniti.com', 'link.me', 'go.ly'];
-  });
-
-  // Dynamic Settings Configuration state
-  const [settings, setSettings] = useState(() => {
-    const local = localStorage.getItem('settings');
-    return local ? JSON.parse(local) : { redirectType: 302, shortCodeLength: 6 };
   });
 
   // Mock User Authentication state
@@ -146,11 +170,6 @@ export default function App() {
     localStorage.setItem('domains', JSON.stringify(domains));
   }, [domains]);
 
-  // Persist settings
-  useEffect(() => {
-    localStorage.setItem('settings', JSON.stringify(settings));
-  }, [settings]);
-
   // Persist user auth details
   useEffect(() => {
     if (user) {
@@ -167,7 +186,6 @@ export default function App() {
 
   // Fetch initial data
   const fetchData = async () => {
-    setLoading(true);
     try {
       const statusRes = await fetch(`${API_BASE_URL}/api/status`).catch(() => null);
       if (statusRes && statusRes.ok) {
@@ -182,13 +200,37 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const statusRes = await fetch(`${API_BASE_URL}/api/status`).catch(() => null);
+        if (cancelled) return;
+        if (statusRes && statusRes.ok) {
+          const statusData = await statusRes.json();
+          setDbMode(statusData.dbMode);
+        }
+
+        const urlsRes = await fetch(`${API_BASE_URL}/api/urls`).catch(() => null);
+        if (cancelled) return;
+        if (urlsRes && urlsRes.ok) {
+          const urlsData = await urlsRes.json();
+          setUrls(urlsData);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleDelete = async (id) => {
@@ -279,7 +321,16 @@ export default function App() {
     <>
       <header className="app-header">
         <div className="container header-content">
-          <a href="/" className="logo-container">
+          <a 
+            href="/" 
+            className="logo-container"
+            onClick={(e) => {
+              e.preventDefault();
+              window.history.pushState({}, '', '/');
+              setCurrentPath('/');
+              window.scrollTo(0, 0);
+            }}
+          >
             <div className="logo-icon-blue">
               <Link2 size={22} style={{ transform: 'rotate(-45deg)' }} />
             </div>
@@ -287,10 +338,10 @@ export default function App() {
           </a>
 
           <nav className="header-nav">
-            <a href="#features" className="nav-link">Features</a>
-            <a href="#pricing" className="nav-link">Pricing</a>
-            <a href="#how-it-works" className="nav-link">How it works</a>
-            <a href="#faq" className="nav-link">FAQ</a>
+            <a href="#features" onClick={(e) => handleNavClick(e, 'features')} className="nav-link">Features</a>
+            <a href="#pricing" onClick={(e) => handleNavClick(e, 'pricing')} className="nav-link">Pricing</a>
+            <a href="#how-it-works" onClick={(e) => handleNavClick(e, 'how-it-works')} className="nav-link">How it works</a>
+            <a href="#faq" onClick={(e) => handleNavClick(e, 'faq')} className="nav-link">FAQ</a>
           </nav>
 
           <div className="header-right">
@@ -321,7 +372,14 @@ export default function App() {
       </header>
 
       <main style={{ flexGrow: 1 }}>
-        {/* Hero Section */}
+        {currentPath === '/terms' || currentPath === '/terms-and-conditions' ? (
+          <TermsPage setCurrentPath={setCurrentPath} />
+        ) : currentPath === '/privacy' || currentPath === '/privacy-policy' ? (
+          <PrivacyPage setCurrentPath={setCurrentPath} />
+        ) : (
+
+          <>
+            {/* Hero Section */}
         <section className="container">
           <div className="badge-container">
             <div className="purple-badge">⚡ Fast. Simple. Reliable.</div>
@@ -338,8 +396,7 @@ export default function App() {
             onShortenSuccess={fetchData} 
             onViewQr={handleOpenQr} 
             apiBaseUrl={API_BASE_URL}
-            domains={domains}
-            settings={settings}
+              domains={domains}
           />
         </section>
 
@@ -506,11 +563,10 @@ export default function App() {
                   activeTab={activeTab}
                   onDelete={handleDelete} 
                   onViewQr={handleOpenQr}
+                  onOpenAnalytics={() => setActiveTab('analytics')}
                   dbMode={dbMode}
                   domains={domains}
                   setDomains={setDomains}
-                  settings={settings}
-                  setSettings={setSettings}
                 />
               </div>
 
@@ -559,7 +615,7 @@ export default function App() {
                 <li><Check size={16} /> Unlimited link shortening maps</li>
                 <li><Check size={16} /> Branded custom domain connections</li>
                 <li><Check size={16} /> Multi-format vector QR code downloads</li>
-                <li><Check size={16} /> Custom 301/302 redirect setups</li>
+                <li><Check size={16} /> Smart link routing controls</li>
               </ul>
               <button 
                 onClick={() => {
@@ -588,7 +644,7 @@ export default function App() {
               </button>
               {activeFaq === 0 && (
                 <div className="faq-answer">
-                  Yes! The core URL shortening functionality is free to use on our base domains. We offer a Premium Pro Tier upgrade that grants custom branded domains support, bulk QR Code exports, and redirect settings.
+                  Yes! The core URL shortening functionality is free to use on our base domains. We offer a Premium Pro Tier upgrade that grants custom branded domains support and advanced QR Code tools.
                 </div>
               )}
             </div>
@@ -612,13 +668,15 @@ export default function App() {
               </button>
               {activeFaq === 2 && (
                 <div className="faq-answer">
-                  By default, redirects are set as temporary (302) to record click statistics. Pro members can customize settings inside the dashboard panel to toggle 301 (Permanent) redirects.
+                  Linkly handles redirects automatically to keep clicks fast and trackable, while Pro members unlock more branding and analytics options.
                 </div>
               )}
             </div>
 
           </div>
         </section>
+          </>
+        )}
       </main>
 
       {/* Footer */}
@@ -656,7 +714,32 @@ export default function App() {
               <ul className="footer-links">
                 <li><a href="#blog">Blog</a></li>
                 <li><a href="#guides">Guides</a></li>
-                <li><a href="#help">Help Center</a></li>
+                <li>
+                  <a 
+                    href="/terms" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.history.pushState({}, '', '/terms');
+                      setCurrentPath('/terms');
+                      window.scrollTo(0, 0);
+                    }}
+                  >
+                    Terms & Conditions
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="/privacy" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.history.pushState({}, '', '/privacy');
+                      setCurrentPath('/privacy');
+                      window.scrollTo(0, 0);
+                    }}
+                  >
+                    Privacy Policy
+                  </a>
+                </li>
                 <li><a href="#status">Status</a></li>
               </ul>
             </div>

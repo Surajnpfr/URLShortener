@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Link2, Sparkles, Copy, Check, QrCode, AlertCircle } from 'lucide-react';
+import { Link2, Copy, Check, QrCode, AlertCircle, Download } from 'lucide-react';
+import { drawQrCanvas, getQrSvgString, downloadFile } from './qrCodeUtils.jsx';
 
-export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['hamroniti.com'], settings = { redirectType: 302, shortCodeLength: 6 } }) {
+export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['hamroniti.com'] }) {
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
   const [domain, setDomain] = useState(domains[0] || 'hamroniti.com');
@@ -10,6 +11,8 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [successQrSvg, setSuccessQrSvg] = useState('');
+  const [successQrLoading, setSuccessQrLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,8 +36,6 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
         body: JSON.stringify({
           url: url.trim(),
           customAlias: customAlias.trim() || undefined,
-          redirectType: settings?.redirectType,
-          shortCodeLength: settings?.shortCodeLength,
         }),
       });
 
@@ -58,6 +59,14 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
       setSuccessResult(formattedResult);
       setUrl('');
       setCustomAlias('');
+      setSuccessQrSvg('');
+      setSuccessQrLoading(true);
+
+      const svg = await getQrSvgString(formattedResult.shortUrl);
+      if (svg) {
+        setSuccessQrSvg(svg);
+      }
+      setSuccessQrLoading(false);
       
       confetti({
         particleCount: 80,
@@ -85,6 +94,18 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
+  };
+
+  const handleDownloadSuccessPng = async () => {
+    if (!successResult) return;
+    const canvas = document.createElement('canvas');
+    await drawQrCanvas(canvas, successResult.shortUrl);
+    downloadFile(canvas.toDataURL('image/png'), `qr-code-${successResult.shortCode}.png`, 'image/png');
+  };
+
+  const handleDownloadSuccessSvg = () => {
+    if (!successResult || !successQrSvg) return;
+    downloadFile(successQrSvg, `qr-code-${successResult.shortCode}.svg`, 'image/svg+xml');
   };
 
   return (
@@ -157,13 +178,13 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
       </form>
 
       {successResult && (
-        <div className="success-box" style={{ marginTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+        <div className="success-box feature-card-surface" style={{ marginTop: '16px' }}>
           <div className="success-header">
             <Check size={18} />
             <span>Link shortened successfully!</span>
           </div>
-          <div className="result-card" style={{ background: 'var(--input-bg)' }}>
-            <div className="result-details">
+          <div className="success-card-grid">
+            <div className="success-card-copy">
               <a
                 href={successResult.shortUrl}
                 target="_blank"
@@ -175,23 +196,41 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
               <div className="original-link-preview">
                 Redirects to: {successResult.originalUrl}
               </div>
+              <div className="result-actions">
+                <button 
+                  onClick={handleCopy} 
+                  className="btn btn-secondary" 
+                  title="Copy short link"
+                >
+                  {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  onClick={() => onViewQr(successResult.shortUrl, successResult.shortCode)}
+                  className="btn btn-secondary btn-icon"
+                  title="View QR Code"
+                >
+                  <QrCode size={16} />
+                </button>
+              </div>
+              <div className="success-download-row">
+                <button type="button" className="success-download-link" onClick={handleDownloadSuccessPng}>
+                  <Download size={14} /> Download QR
+                </button>
+                <button type="button" className="success-download-link" onClick={handleDownloadSuccessPng}>
+                  PNG
+                </button>
+                <button type="button" className="success-download-link" onClick={handleDownloadSuccessSvg}>
+                  SVG
+                </button>
+              </div>
             </div>
-            <div className="result-actions">
-              <button 
-                onClick={handleCopy} 
-                className="btn btn-secondary" 
-                title="Copy short link"
-              >
-                {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-              <button
-                onClick={() => onViewQr(successResult.shortUrl, successResult.shortCode)}
-                className="btn btn-secondary btn-icon"
-                title="View QR Code"
-              >
-                <QrCode size={16} />
-              </button>
+            <div className="success-qr-preview">
+              {successQrLoading ? (
+                <div className="success-qr-placeholder">Loading QR...</div>
+              ) : (
+                <div className="success-qr-svg" dangerouslySetInnerHTML={{ __html: successQrSvg }} />
+              )}
             </div>
           </div>
         </div>

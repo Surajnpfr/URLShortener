@@ -1,19 +1,83 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Card, Empty, Typography } from './antd.jsx';
+import { copyToClipboard, downloadFile, drawQrCanvas, getQrSvgString, getShortDisplay } from './qrCodeUtils.jsx';
 import { 
-  Copy, Check, QrCode, Trash2, ExternalLink, BarChart2, 
-  Link2, Users, Target, Shield, Search, ArrowUpRight, Globe, Laptop,
+  Plus, Copy, Check, QrCode, Trash2, BarChart2, 
+  Link2, Users, Target, Search, Globe,
   MoreVertical
 } from 'lucide-react';
+import AccountSettingsPage from './AccountSettingsPage';
+
+const truncateUrl = (value, maxLength = 54) => getShortDisplay(value, maxLength);
+
+const QrGalleryCard = ({ item, onCopy, onOpenQr }) => {
+  const [svgMarkup, setSvgMarkup] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    const load = async () => {
+      const svg = await getQrSvgString(item.shortUrl);
+      if (active) {
+        setSvgMarkup(svg);
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, [item.shortUrl]);
+
+  const handleDownloadPng = async () => {
+    const canvas = document.createElement('canvas');
+    await drawQrCanvas(canvas, item.shortUrl);
+    downloadFile(canvas.toDataURL('image/png'), `qr-code-${item.shortCode}.png`, 'image/png');
+  };
+
+  const handleDownloadSvg = () => {
+    if (!svgMarkup) return;
+    downloadFile(svgMarkup, `qr-code-${item.shortCode}.svg`, 'image/svg+xml');
+  };
+
+  return (
+    <Card className="qr-gallery-card" bordered>
+      <div className="qr-gallery-preview">
+        {svgMarkup ? <div dangerouslySetInnerHTML={{ __html: svgMarkup }} /> : <div className="qr-gallery-loading">Loading QR...</div>}
+      </div>
+      <div className="qr-gallery-copy">
+        <Typography.Text strong>{item.shortUrl}</Typography.Text>
+        <Typography.Text type="secondary">{truncateUrl(item.originalUrl)}</Typography.Text>
+        <Typography.Text type="secondary">Created {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Typography.Text>
+      </div>
+      <div className="qr-gallery-actions">
+        <button type="button" className="qr-gallery-action" onClick={() => onCopy(item._id, item.shortUrl)}>
+          <Copy size={14} /> Copy Link
+        </button>
+        <button type="button" className="qr-gallery-action" onClick={handleDownloadPng}>
+          Download PNG
+        </button>
+        <button type="button" className="qr-gallery-action" onClick={handleDownloadSvg}>
+          Download SVG
+        </button>
+        <button type="button" className="qr-gallery-action primary" onClick={() => onOpenQr(item.shortUrl, item.shortCode)}>
+          <QrCode size={14} /> Open QR
+        </button>
+      </div>
+    </Card>
+  );
+};
 
 export default function UrlList({ 
-  urls, activeTab, onDelete, onViewQr, dbMode,
-  domains = ['hamroniti.com'], setDomains, settings = { redirectType: 302, shortCodeLength: 6 }, setSettings 
+  urls, activeTab, onDelete, onViewQr, onOpenAnalytics,
+  domains = ['hamroniti.com'], setDomains
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [qrSearchQuery, setQrSearchQuery] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [newDomainInput, setNewDomainInput] = useState('');
-  const [settingsSaved, setSettingsSaved] = useState(false);
 
   const handleAddDomain = (e) => {
     e.preventDefault();
@@ -45,18 +109,9 @@ export default function UrlList({
     }
   };
 
-  const handleSettingsChange = (key, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 2000);
-  };
-
   const handleCopy = async (id, shortUrl) => {
     try {
-      await navigator.clipboard.writeText(shortUrl);
+      await copyToClipboard(shortUrl);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
@@ -101,6 +156,11 @@ export default function UrlList({
     url.originalUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
     url.shortCode.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const qrFilteredUrls = urls.filter((url) => {
+    const query = qrSearchQuery.toLowerCase();
+    return url.originalUrl.toLowerCase().includes(query) || url.shortUrl.toLowerCase().includes(query);
+  });
 
   // 1. Dashboard View
   if (activeTab === 'dashboard') {
@@ -229,48 +289,51 @@ export default function UrlList({
                         <span className="date-text">{formatDate(item.createdAt)}</span>
                       </td>
                       <td>
-                        <div className="actions-menu-wrapper" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div className="link-row-actions">
                           <button
-                            onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
-                            className="btn-dots"
-                            title="Actions"
+                            onClick={() => handleCopy(item._id, item.shortUrl)}
+                            className="link-row-action"
+                            title="Copy Link"
                           >
-                            <MoreVertical size={16} />
+                            {copiedId === item._id ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Copy size={14} />}
                           </button>
-                          {activeMenuId === item._id && (
-                            <div className="dots-dropdown">
-                              <button
-                                onClick={() => {
-                                  handleCopy(item._id, item.shortUrl);
-                                  setActiveMenuId(null);
-                                }}
-                                className="dropdown-item"
-                              >
-                                <Copy size={13} />
-                                Copy Link
-                              </button>
-                              <button
-                                onClick={() => {
-                                  onViewQr(item.shortUrl, item.shortCode);
-                                  setActiveMenuId(null);
-                                }}
-                                className="dropdown-item"
-                              >
-                                <QrCode size={13} />
-                                QR Code
-                              </button>
-                              <button
-                                onClick={() => {
-                                  onDelete(item._id);
-                                  setActiveMenuId(null);
-                                }}
-                                className="dropdown-item danger-item"
-                              >
-                                <Trash2 size={13} />
-                                Delete
-                              </button>
-                            </div>
-                          )}
+                          <button
+                            onClick={() => onOpenAnalytics?.()}
+                            className="link-row-action"
+                            title="Analytics"
+                          >
+                            <BarChart2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => onViewQr(item.shortUrl, item.shortCode)}
+                            className="link-row-action"
+                            title="QR Code"
+                          >
+                            <QrCode size={14} />
+                          </button>
+                          <div className="actions-menu-wrapper" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
+                              className="btn-dots"
+                              title="More"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            {activeMenuId === item._id && (
+                              <div className="dots-dropdown">
+                                <button
+                                  onClick={() => {
+                                    onDelete(item._id);
+                                    setActiveMenuId(null);
+                                  }}
+                                  className="dropdown-item danger-item"
+                                >
+                                  <Trash2 size={13} />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -288,7 +351,7 @@ export default function UrlList({
   if (activeTab === 'links') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <h3>All shortened links ({filteredUrls.length})</h3>
           <div className="input-wrapper" style={{ maxWidth: '300px' }}>
             <Search size={16} className="input-icon" />
@@ -438,50 +501,42 @@ export default function UrlList({
   // 4. QR Codes Tab
   if (activeTab === 'qrcodes') {
     return (
-      <div>
-        <h3>QR Codes Grid</h3>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-          Generate, preview, and download custom high-resolution QR codes in bulk.
-        </p>
-
-        {urls.length === 0 ? (
-          <div className="empty-state">
-            <QrCode size={40} />
-            <p>No shortened links found yet.</p>
+      <div className="qr-gallery-section">
+        <div className="qr-gallery-header">
+          <div>
+            <h3>QR Codes Gallery</h3>
+            <p>Search, preview, and download QR codes for every shortened link.</p>
           </div>
+          <div className="input-wrapper qr-gallery-search">
+            <Search size={16} className="input-icon" />
+            <input
+              type="text"
+              placeholder="Search by short URL or original URL"
+              value={qrSearchQuery}
+              onChange={(event) => setQrSearchQuery(event.target.value)}
+              className="form-input"
+              style={{ padding: '10px 10px 10px 40px', borderRadius: '12px', fontSize: '0.875rem' }}
+            />
+          </div>
+        </div>
+
+        {qrFilteredUrls.length === 0 ? (
+          <Empty
+            className="qr-empty-state"
+            image={<QrCode size={64} />}
+            description={urls.length === 0 ? 'Your QR codes will appear here.' : 'No QR codes match your search.'}
+          >
+            {urls.length === 0 ? 'Create your first shortened link to generate a QR code.' : null}
+          </Empty>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '20px' }}>
-            {urls.map((item) => (
-              <div 
-                key={item._id} 
-                className="card" 
-                style={{ 
-                  margin: 0, 
-                  padding: '20px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  gap: '12px',
-                  background: 'var(--card-bg)'
-                }}
-              >
-                <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '10px', display: 'flex', justifyContent: 'center' }}>
-                  <QrCode size={100} style={{ color: 'var(--primary)' }} />
-                </div>
-                <div style={{ textAlign: 'center', width: '100%' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, wordBreak: 'break-all' }}>{item.shortCode}</span>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.originalUrl}
-                  </p>
-                </div>
-                <button 
-                  className="btn-newlink" 
-                  onClick={() => onViewQr(item.shortUrl, item.shortCode)}
-                  style={{ width: '100%', padding: '6px 12px', fontSize: '0.75rem', justifyContent: 'center' }}
-                >
-                  Configure QR
-                </button>
-              </div>
+          <div className="qr-gallery-grid">
+            {qrFilteredUrls.map((item) => (
+              <QrGalleryCard
+                key={item._id}
+                item={item}
+                onCopy={handleCopy}
+                onOpenQr={onViewQr}
+              />
             ))}
           </div>
         )}
@@ -548,71 +603,7 @@ export default function UrlList({
 
   // 6. Settings Tab
   if (activeTab === 'settings') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h3>Application Settings</h3>
-        
-        <div style={{ border: '1px solid var(--card-border)', borderRadius: '12px', padding: '32px', background: 'var(--card-bg)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h4 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Custom Shortener Parameters</h4>
-            
-            {/* Redirect type select option */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label>Default Redirect Status</label>
-              <select
-                value={settings.redirectType}
-                onChange={(e) => handleSettingsChange('redirectType', parseInt(e.target.value))}
-                className="form-field"
-                style={{ maxWidth: '300px', height: '46px' }}
-              >
-                <option value={302}>302 - Temporary Redirect (Tracks clicks)</option>
-                <option value={301}>301 - Permanent Redirect (SEO optimized)</option>
-              </select>
-            </div>
-
-            {/* Shortcode length selector slider */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <label style={{ display: 'flex', justifyContent: 'space-between', maxWidth: '300px' }}>
-                <span>Shortcode Length</span>
-                <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{settings.shortCodeLength} chars</span>
-              </label>
-              <input
-                type="range"
-                min="4"
-                max="12"
-                value={settings.shortCodeLength}
-                onChange={(e) => handleSettingsChange('shortCodeLength', parseInt(e.target.value))}
-                style={{ maxWidth: '300px', height: '8px', cursor: 'pointer', outline: 'none' }}
-              />
-            </div>
-            
-            {settingsSaved && (
-              <div style={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Check size={14} /> Settings updated & saved to cache!
-              </div>
-            )}
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '24px' }}>
-            <h4 style={{ marginBottom: '8px', fontSize: '1.05rem', fontWeight: 700 }}>System Architecture Details</h4>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>View connection stats and core API parameters.</p>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={{ padding: '16px', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Database Connection Status</span>
-                <h4 style={{ fontSize: '1rem', color: 'var(--success)', marginTop: '4px' }}>Connected (Live: {dbMode})</h4>
-              </div>
-              <div style={{ padding: '16px', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Local Cache Store</span>
-                <h4 style={{ fontSize: '1rem', marginTop: '4px' }}>{totalLinks} registered records</h4>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    );
+    return <AccountSettingsPage />;
   }
 
   return null;
