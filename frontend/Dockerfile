@@ -8,7 +8,7 @@ RUN npm install
 
 COPY . .
 
-# Inject Railway environment variables at build-time
+# Inject API URL at build-time (production: https://app.trixam.com)
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 

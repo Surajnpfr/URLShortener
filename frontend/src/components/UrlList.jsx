@@ -7,7 +7,7 @@ import {
 
 export default function UrlList({ 
   urls, activeTab, onDelete, onViewQr, dbMode,
-  domains = ['hamroniti.com'], setDomains, settings = { redirectType: 302, shortCodeLength: 6 }, setSettings 
+  domains = ['drovashop.com'], setDomains, settings = { redirectType: 302, shortCodeLength: 6 }, setSettings 
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,7 +36,7 @@ export default function UrlList({
   };
 
   const handleRemoveDomain = (d) => {
-    if (d === 'hamroniti.com') {
+    if (d === 'drovashop.com') {
       alert('Cannot delete the default system domain.');
       return;
     }
@@ -527,8 +527,8 @@ export default function UrlList({
             <h5 style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configured Domains</h5>
             {domains.map((d) => (
               <div key={d} style={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d} {d === 'hamroniti.com' && '(Default)'}</span>
-                {d === 'hamroniti.com' ? (
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d} {d === 'drovashop.com' && '(Default)'}</span>
+                {d === 'drovashop.com' ? (
                   <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>ACTIVE</span>
                 ) : (
                   <button 

@@ -2,6 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB, getDbMode } from './config/db.js';
+import {
+  buildShortUrl,
+  getAllowedDashboardOrigins,
+  getAllowedHoldingOrigins,
+  getHoldingPageUrl,
+  getShortLinkBaseUrl,
+} from './config/env.js';
 import Url from './models/Url.js';
 
 dotenv.config();
@@ -20,8 +27,30 @@ await connectDB();
 // Required for correct req.protocol (HTTP vs HTTPS) and IP logging
 app.set('trust proxy', 1);
 
-// Enable CORS for cross-origin frontend requests
-app.use(cors());
+// CORS: dashboard (trixam.com) for API; drovashop.com for /api/resolve only
+const dashboardOrigins = getAllowedDashboardOrigins();
+const holdingOrigins = getAllowedHoldingOrigins();
+
+app.use((req, res, next) => {
+  const isResolveRoute = req.path.startsWith('/api/resolve');
+  const allowedOrigins = isResolveRoute ? holdingOrigins : dashboardOrigins;
+
+  return cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
+  })(req, res, next);
+});
 
 // Parse incoming JSON payloads
 app.use(express.json());
@@ -39,6 +68,51 @@ function generateShortCode(length = 6) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+}
+
+function renderNotFoundPage(baseUrl) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Link Not Found</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0b0f19; color: #f3f4f6; text-align: center; padding: 50px 20px; }
+        .card { max-width: 500px; margin: 0 auto; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 40px; border-radius: 16px; backdrop-filter: blur(10px); }
+        h1 { color: #f87171; margin-top: 0; }
+        p { color: #9ca3af; font-size: 1.1rem; line-height: 1.6; }
+        a { display: inline-block; margin-top: 20px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: opacity 0.2s; }
+        a:hover { opacity: 0.9; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>404 - Link Not Found</h1>
+        <p>The shortened link you are trying to access does not exist or has expired.</p>
+        <a href="${baseUrl}">Go to URL Shortener</a>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function handleShortCodeRedirect(req, res, shortCode) {
+  const urlDoc = await Url.findOne({ shortCode });
+  if (!urlDoc) {
+    const baseUrl = getShortLinkBaseUrl(req);
+    return res.status(404).send(renderNotFoundPage(baseUrl));
+  }
+
+  urlDoc.clicks = (urlDoc.clicks || 0) + 1;
+  await urlDoc.save();
+
+  const holdingUrl = getHoldingPageUrl(shortCode);
+  if (holdingUrl) {
+    return res.redirect(302, holdingUrl);
+  }
+
+  res.redirect(urlDoc.redirectType || 302, urlDoc.originalUrl);
 }
 
 // ==========================================
@@ -86,13 +160,13 @@ app.get('/api/status', (req, res) => {
 app.get('/api/urls', async (req, res) => {
   try {
     const urls = await Url.find().sort({ createdAt: -1 });
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getShortLinkBaseUrl(req);
     
     const formattedUrls = urls.map(item => ({
       _id: item._id,
       originalUrl: item.originalUrl,
       shortCode: item.shortCode,
-      shortUrl: `${baseUrl}/${item.shortCode}`,
+      shortUrl: buildShortUrl(baseUrl, item.shortCode),
       clicks: item.clicks,
       createdAt: item.createdAt,
     }));
@@ -167,13 +241,13 @@ app.post('/api/shorten', async (req, res) => {
       redirectType: parsedRedirectType,
     });
 
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = getShortLinkBaseUrl(req);
     
     res.status(201).json({
       _id: newUrl._id,
       originalUrl: newUrl.originalUrl,
       shortCode: newUrl.shortCode,
-      shortUrl: `${baseUrl}/${newUrl.shortCode}`,
+      shortUrl: buildShortUrl(baseUrl, newUrl.shortCode),
       clicks: newUrl.clicks,
       createdAt: newUrl.createdAt,
       redirectType: newUrl.redirectType,
@@ -182,6 +256,26 @@ app.post('/api/shorten', async (req, res) => {
   } catch (error) {
     console.error('Error shortening URL:', error);
     res.status(500).json({ error: 'Server error while shortening URL' });
+  }
+});
+
+// GET Resolve short code for holding page (no click increment)
+app.get('/api/resolve/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
+  const { shortCode } = req.params;
+
+  try {
+    const urlDoc = await Url.findOne({ shortCode });
+    if (!urlDoc) {
+      return res.status(404).json({ error: 'Shortened URL not found' });
+    }
+
+    res.json({
+      originalUrl: urlDoc.originalUrl,
+      redirectType: urlDoc.redirectType || 302,
+    });
+  } catch (error) {
+    console.error('Error resolving URL:', error);
+    res.status(500).json({ error: 'Server error resolving URL' });
   }
 });
 
@@ -204,43 +298,20 @@ app.delete('/api/urls/:id', async (req, res) => {
 // 5. REDIRECTION & CATCH-ALL ROUTING
 // ==========================================
 
-// Redirect Endpoint with strict regex check (ignores favicon.ico, etc.)
-app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
-  const { shortCode } = req.params;
+// Short-link redirect (production path: /go/:shortCode)
+app.get('/go/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   try {
-    const urlDoc = await Url.findOne({ shortCode });
-    if (!urlDoc) {
-      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-      return res.status(404).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Link Not Found</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0b0f19; color: #f3f4f6; text-align: center; padding: 50px 20px; }
-            .card { max-width: 500px; margin: 0 auto; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 40px; border-radius: 16px; backdrop-filter: blur(10px); }
-            h1 { color: #f87171; margin-top: 0; }
-            p { color: #9ca3af; font-size: 1.1rem; line-height: 1.6; }
-            a { display: inline-block; margin-top: 20px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: opacity 0.2s; }
-            a:hover { opacity: 0.9; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>404 - Link Not Found</h1>
-            <p>The shortened link you are trying to access does not exist or has expired.</p>
-            <a href="${baseUrl}">Go to URL Shortener</a>
-          </div>
-        </body>
-        </html>
-      `);
-    }
+    await handleShortCodeRedirect(req, res, req.params.shortCode);
+  } catch (error) {
+    console.error('Redirection error:', error);
+    res.status(500).send('Server redirection error');
+  }
+});
 
-    urlDoc.clicks = (urlDoc.clicks || 0) + 1;
-    await urlDoc.save();
-
-    res.redirect(urlDoc.redirectType || 302, urlDoc.originalUrl);
+// Redirect fallback for local dev (root-level /:shortCode)
+app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
+  try {
+    await handleShortCodeRedirect(req, res, req.params.shortCode);
   } catch (error) {
     console.error('Redirection error:', error);
     res.status(500).send('Server redirection error');

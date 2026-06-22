@@ -99,10 +99,10 @@ export default function App() {
     const local = localStorage.getItem('domains');
     if (local) {
       const parsed = JSON.parse(local);
-      if (parsed.includes('hamroniti.com')) return parsed;
-      return ['hamroniti.com', ...parsed.filter(d => d !== 'linkly.to')];
+      if (parsed.includes('drovashop.com')) return parsed;
+      return ['drovashop.com', ...parsed.filter(d => d !== 'linkly.to')];
     }
-    return ['hamroniti.com', 'link.me', 'go.ly'];
+    return ['drovashop.com'];
   });
 
   // Dynamic Settings Configuration state
