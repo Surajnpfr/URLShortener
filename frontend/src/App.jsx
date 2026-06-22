@@ -124,16 +124,7 @@ export default function App() {
   };
 
 
-  // Dynamic Custom Domains List state
-  const [domains, setDomains] = useState(() => {
-    const local = localStorage.getItem('domains');
-    if (local) {
-      const parsed = JSON.parse(local);
-      if (parsed.includes('hamroniti.com')) return parsed;
-      return ['hamroniti.com', ...parsed.filter(d => d !== 'linkly.to')];
-    }
-    return ['hamroniti.com', 'link.me', 'go.ly'];
-  });
+ 
 
   // Mock User Authentication state
   const [user, setUser] = useState(() => {
@@ -165,10 +156,7 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Persist domains list
-  useEffect(() => {
-    localStorage.setItem('domains', JSON.stringify(domains));
-  }, [domains]);
+ 
 
   // Persist user auth details
   useEffect(() => {
@@ -396,7 +384,7 @@ export default function App() {
             onShortenSuccess={fetchData} 
             onViewQr={handleOpenQr} 
             apiBaseUrl={API_BASE_URL}
-              domains={domains}
+            
           />
         </section>
 
@@ -510,15 +498,7 @@ export default function App() {
                       QR Codes
                     </button>
                   </li>
-                  <li className="sidebar-item">
-                    <button 
-                      onClick={() => setActiveTab('domains')} 
-                      className={`sidebar-link ${activeTab === 'domains' ? 'active' : ''}`}
-                    >
-                      <Globe size={18} />
-                      Custom Domains
-                    </button>
-                  </li>
+               
                   <li className="sidebar-item">
                     <button 
                       onClick={() => setActiveTab('settings')} 
@@ -547,8 +527,7 @@ export default function App() {
                     {activeTab === 'links' && 'Links'}
                     {activeTab === 'analytics' && 'Analytics'}
                     {activeTab === 'qrcodes' && 'QR Codes'}
-                    {activeTab === 'domains' && 'Custom Domains'}
-                    {activeTab === 'settings' && 'Settings'}
+
                   </h2>
                   {(activeTab === 'dashboard' || activeTab === 'links') && (
                     <button className="btn-newlink" onClick={handleScrollToShortener}>
@@ -565,8 +544,8 @@ export default function App() {
                   onViewQr={handleOpenQr}
                   onOpenAnalytics={() => setActiveTab('analytics')}
                   dbMode={dbMode}
-                  domains={domains}
-                  setDomains={setDomains}
+                 
+                 
                 />
               </div>
 

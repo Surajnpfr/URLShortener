@@ -3,10 +3,9 @@ import confetti from 'canvas-confetti';
 import { Link2, Copy, Check, QrCode, AlertCircle, Download } from 'lucide-react';
 import { drawQrCanvas, getQrSvgString, downloadFile } from './qrCodeUtils.jsx';
 
-export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['hamroniti.com'] }) {
+export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }) {
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
-  const [domain, setDomain] = useState(domains[0] || 'hamroniti.com');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);
@@ -48,13 +47,7 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
       // We override data.shortUrl base domain if user selected a custom domain in the select box!
       // This is purely visual to match the dropdown selection: e.g. replacing 'localhost:5000' with selected domain.
       const formattedResult = { ...data };
-      if (domain !== 'linkly.to') {
-        formattedResult.shortUrl = formattedResult.shortUrl.replace('localhost:5000', domain);
-      } else {
-        // Alternatively, use standard linkly.to for mockup display, but allow it to link to localhost for redirects
-        // Let's keep localhost:5000 so clicking redirects actually works, or replace with domain for mockup presentation.
-        // Let's replace only the display presentation so it looks premium, but allow clicking to open the real redirect!
-      }
+     
 
       setSuccessResult(formattedResult);
       setUrl('');
@@ -129,19 +122,6 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
               disabled={loading}
               className="shortener-input"
             />
-          </div>
-
-          <div className="domain-select-wrapper">
-            <select
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              className="domain-select"
-              disabled={loading}
-            >
-              {domains.map((dom) => (
-                <option key={dom} value={dom}>{dom}</option>
-              ))}
-            </select>
           </div>
 
           <button type="submit" disabled={loading} className="btn-shorten">

@@ -70,8 +70,7 @@ const QrGalleryCard = ({ item, onCopy, onOpenQr }) => {
 };
 
 export default function UrlList({ 
-  urls, activeTab, onDelete, onViewQr, onOpenAnalytics,
-  domains = ['hamroniti.com'], setDomains
+  urls, activeTab, onDelete, onViewQr, onOpenAnalytics, setDomains
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,8 +94,7 @@ export default function UrlList({
       return;
     }
 
-    setDomains(prev => [...prev, d]);
-    setNewDomainInput('');
+
   };
 
   const handleRemoveDomain = (d) => {
@@ -104,9 +102,7 @@ export default function UrlList({
       alert('Cannot delete the default system domain.');
       return;
     }
-    if (window.confirm(`Are you sure you want to remove the custom domain "${d}"?`)) {
-      setDomains(prev => prev.filter(item => item !== d));
-    }
+   
   };
 
   const handleCopy = async (id, shortUrl) => {
@@ -544,62 +540,7 @@ export default function UrlList({
     );
   }
 
-  // 5. Custom Domains Tab
-  if (activeTab === 'domains') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h3>Custom Domains</h3>
-        
-        <div style={{ border: '1px solid var(--card-border)', borderRadius: '12px', padding: '32px', background: 'var(--card-bg)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div className="feature-icon-box" style={{ background: '#ecfdf5', color: '#10b981' }}>
-              <Globe size={24} />
-            </div>
-            <div>
-              <h4>Brand your shortened links</h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                Connect your own domain name (e.g. <code>brand.link</code>) to keep your links recognizable.
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleAddDomain} style={{ display: 'flex', gap: '12px' }}>
-            <input 
-              type="text" 
-              placeholder="e.g. go.mybrand.com" 
-              value={newDomainInput} 
-              onChange={(e) => setNewDomainInput(e.target.value)}
-              className="form-field" 
-              style={{ maxWidth: '300px' }}
-            />
-            <button type="submit" className="btn-newlink" style={{ height: '46px' }}>
-              <Plus size={16} />
-              Add Domain
-            </button>
-          </form>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-            <h5 style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configured Domains</h5>
-            {domains.map((d) => (
-              <div key={d} style={{ background: 'var(--bg-color)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d} {d === 'hamroniti.com' && '(Default)'}</span>
-                {d === 'hamroniti.com' ? (
-                  <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>ACTIVE</span>
-                ) : (
-                  <button 
-                    onClick={() => handleRemoveDomain(d)} 
-                    style={{ background: 'none', border: 'none', color: 'var(--danger)', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  
 
   // 6. Settings Tab
   if (activeTab === 'settings') {

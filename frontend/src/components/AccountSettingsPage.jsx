@@ -106,9 +106,8 @@ const normalizeStats = (payload) => {
   const totalLinks = stats.totalLinksCreated ?? stats.totalLinks ?? stats.linksCreated ?? stats.linkCount;
   const totalClicks = stats.totalClicks ?? stats.clicks ?? stats.clickCount;
   const qrCodesGenerated = stats.qrCodesGenerated ?? stats.totalQrCodes ?? stats.qrCodes ?? stats.qrCount;
-  const customDomainsCount = stats.customDomainsCount ?? stats.customDomains ?? stats.domainsCount;
 
-  if ([totalLinks, totalClicks, qrCodesGenerated, customDomainsCount].some((value) => value === undefined || value === null)) {
+  if ([totalLinks, totalClicks, qrCodesGenerated].some((value) => value === undefined || value === null)) {
     return null;
   }
 
