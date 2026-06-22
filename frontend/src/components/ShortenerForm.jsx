@@ -1,15 +1,24 @@
 import { useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Link2, Sparkles, Copy, Check, QrCode, AlertCircle } from 'lucide-react';
+import { Link2, Copy, Check, QrCode, AlertCircle, Download } from 'lucide-react';
+import { drawQrCanvas, getQrSvgString, downloadFile } from './qrCodeUtils.jsx';
 
+<<<<<<< HEAD
 export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['drovashop.com'], settings = { redirectType: 302, shortCodeLength: 6 } }) {
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
   const [domain, setDomain] = useState(domains[0] || 'drovashop.com');
+=======
+export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }) {
+  const [url, setUrl] = useState('');
+  const [customAlias, setCustomAlias] = useState('');
+>>>>>>> c49193b20b300406eb3aeea420f9305225b431b0
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [successQrSvg, setSuccessQrSvg] = useState('');
+  const [successQrLoading, setSuccessQrLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,8 +42,6 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
         body: JSON.stringify({
           url: url.trim(),
           customAlias: customAlias.trim() || undefined,
-          redirectType: settings?.redirectType,
-          shortCodeLength: settings?.shortCodeLength,
         }),
       });
 
@@ -47,17 +54,19 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
       // We override data.shortUrl base domain if user selected a custom domain in the select box!
       // This is purely visual to match the dropdown selection: e.g. replacing 'localhost:5000' with selected domain.
       const formattedResult = { ...data };
-      if (domain !== 'linkly.to') {
-        formattedResult.shortUrl = formattedResult.shortUrl.replace('localhost:5000', domain);
-      } else {
-        // Alternatively, use standard linkly.to for mockup display, but allow it to link to localhost for redirects
-        // Let's keep localhost:5000 so clicking redirects actually works, or replace with domain for mockup presentation.
-        // Let's replace only the display presentation so it looks premium, but allow clicking to open the real redirect!
-      }
+     
 
       setSuccessResult(formattedResult);
       setUrl('');
       setCustomAlias('');
+      setSuccessQrSvg('');
+      setSuccessQrLoading(true);
+
+      const svg = await getQrSvgString(formattedResult.shortUrl);
+      if (svg) {
+        setSuccessQrSvg(svg);
+      }
+      setSuccessQrLoading(false);
       
       confetti({
         particleCount: 80,
@@ -87,6 +96,18 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
     }
   };
 
+  const handleDownloadSuccessPng = async () => {
+    if (!successResult) return;
+    const canvas = document.createElement('canvas');
+    await drawQrCanvas(canvas, successResult.shortUrl);
+    downloadFile(canvas.toDataURL('image/png'), `qr-code-${successResult.shortCode}.png`, 'image/png');
+  };
+
+  const handleDownloadSuccessSvg = () => {
+    if (!successResult || !successQrSvg) return;
+    downloadFile(successQrSvg, `qr-code-${successResult.shortCode}.svg`, 'image/svg+xml');
+  };
+
   return (
     <div className="shortener-card">
       <form onSubmit={handleSubmit}>
@@ -108,19 +129,6 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
               disabled={loading}
               className="shortener-input"
             />
-          </div>
-
-          <div className="domain-select-wrapper">
-            <select
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              className="domain-select"
-              disabled={loading}
-            >
-              {domains.map((dom) => (
-                <option key={dom} value={dom}>{dom}</option>
-              ))}
-            </select>
           </div>
 
           <button type="submit" disabled={loading} className="btn-shorten">
@@ -157,13 +165,13 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
       </form>
 
       {successResult && (
-        <div className="success-box" style={{ marginTop: '16px', borderTop: '1px solid var(--card-border)' }}>
+        <div className="success-box feature-card-surface" style={{ marginTop: '16px' }}>
           <div className="success-header">
             <Check size={18} />
             <span>Link shortened successfully!</span>
           </div>
-          <div className="result-card" style={{ background: 'var(--input-bg)' }}>
-            <div className="result-details">
+          <div className="success-card-grid">
+            <div className="success-card-copy">
               <a
                 href={successResult.shortUrl}
                 target="_blank"
@@ -175,23 +183,41 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, 
               <div className="original-link-preview">
                 Redirects to: {successResult.originalUrl}
               </div>
+              <div className="result-actions">
+                <button 
+                  onClick={handleCopy} 
+                  className="btn btn-secondary" 
+                  title="Copy short link"
+                >
+                  {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  onClick={() => onViewQr(successResult.shortUrl, successResult.shortCode)}
+                  className="btn btn-secondary btn-icon"
+                  title="View QR Code"
+                >
+                  <QrCode size={16} />
+                </button>
+              </div>
+              <div className="success-download-row">
+                <button type="button" className="success-download-link" onClick={handleDownloadSuccessPng}>
+                  <Download size={14} /> Download QR
+                </button>
+                <button type="button" className="success-download-link" onClick={handleDownloadSuccessPng}>
+                  PNG
+                </button>
+                <button type="button" className="success-download-link" onClick={handleDownloadSuccessSvg}>
+                  SVG
+                </button>
+              </div>
             </div>
-            <div className="result-actions">
-              <button 
-                onClick={handleCopy} 
-                className="btn btn-secondary" 
-                title="Copy short link"
-              >
-                {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-              <button
-                onClick={() => onViewQr(successResult.shortUrl, successResult.shortCode)}
-                className="btn btn-secondary btn-icon"
-                title="View QR Code"
-              >
-                <QrCode size={16} />
-              </button>
+            <div className="success-qr-preview">
+              {successQrLoading ? (
+                <div className="success-qr-placeholder">Loading QR...</div>
+              ) : (
+                <div className="success-qr-svg" dangerouslySetInnerHTML={{ __html: successQrSvg }} />
+              )}
             </div>
           </div>
         </div>
