@@ -1,7 +1,6 @@
-import mongoose from 'mongoose';
-import { getDbMode } from '../config/db.js';
+const mongoose = require('mongoose');
+const { getDbMode } = require('../config/db');
 
-// --- MongoDB / Mongoose Setup ---
 const UrlSchema = new mongoose.Schema({
   originalUrl: {
     type: String,
@@ -29,7 +28,6 @@ const UrlSchema = new mongoose.Schema({
 
 const MongooseUrlModel = mongoose.model('Url', UrlSchema);
 
-// --- In-Memory Mock Database Setup ---
 const mockDb = [];
 
 class MockUrlDocument {
@@ -43,7 +41,7 @@ class MockUrlDocument {
   }
 
   async save() {
-    const idx = mockDb.findIndex(item => item._id === this._id);
+    const idx = mockDb.findIndex((item) => item._id === this._id);
     if (idx !== -1) {
       mockDb[idx] = this;
     } else {
@@ -54,24 +52,21 @@ class MockUrlDocument {
 }
 
 const MockUrlModel = {
-  find: () => {
-    return {
-      sort: (sortObj) => {
-        // Sort descending by createdAt
-        const sorted = [...mockDb]
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .map(item => new MockUrlDocument(item));
-        return Promise.resolve(sorted);
-      },
-      then: (resolve) => {
-        const mapped = mockDb.map(item => new MockUrlDocument(item));
-        return Promise.resolve(mapped).then(resolve);
-      }
-    };
-  },
+  find: () => ({
+    sort: () => {
+      const sorted = [...mockDb]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .map((item) => new MockUrlDocument(item));
+      return Promise.resolve(sorted);
+    },
+    then: (resolve) => {
+      const mapped = mockDb.map((item) => new MockUrlDocument(item));
+      return Promise.resolve(mapped).then(resolve);
+    },
+  }),
 
   findOne: async (query) => {
-    const found = mockDb.find(item => {
+    const found = mockDb.find((item) => {
       if (query.shortCode && item.shortCode === query.shortCode) return true;
       if (query._id && item._id === query._id) return true;
       return false;
@@ -86,38 +81,37 @@ const MockUrlModel = {
   },
 
   findByIdAndDelete: async (id) => {
-    const idx = mockDb.findIndex(item => item._id === id);
+    const idx = mockDb.findIndex((item) => item._id === id);
     if (idx !== -1) {
       const deleted = mockDb[idx];
       mockDb.splice(idx, 1);
       return new MockUrlDocument(deleted);
     }
     return null;
-  }
+  },
 };
 
-// --- Dynamic Model Wrapper ---
 const Url = {
-  find: (...args) => {
-    return getDbMode() === 'MOCK' 
-      ? MockUrlModel.find() 
-      : MongooseUrlModel.find(...args);
-  },
-  findOne: (...args) => {
-    return getDbMode() === 'MOCK' 
-      ? MockUrlModel.findOne(...args) 
-      : MongooseUrlModel.findOne(...args);
-  },
-  create: (...args) => {
-    return getDbMode() === 'MOCK' 
-      ? MockUrlModel.create(...args) 
-      : MongooseUrlModel.create(...args);
-  },
-  findByIdAndDelete: (...args) => {
-    return getDbMode() === 'MOCK' 
-      ? MockUrlModel.findByIdAndDelete(...args) 
-      : MongooseUrlModel.findByIdAndDelete(...args);
-  }
+  find: (...args) => (
+    getDbMode() === 'MOCK'
+      ? MockUrlModel.find()
+      : MongooseUrlModel.find(...args)
+  ),
+  findOne: (...args) => (
+    getDbMode() === 'MOCK'
+      ? MockUrlModel.findOne(...args)
+      : MongooseUrlModel.findOne(...args)
+  ),
+  create: (...args) => (
+    getDbMode() === 'MOCK'
+      ? MockUrlModel.create(...args)
+      : MongooseUrlModel.create(...args)
+  ),
+  findByIdAndDelete: (...args) => (
+    getDbMode() === 'MOCK'
+      ? MockUrlModel.findByIdAndDelete(...args)
+      : MongooseUrlModel.findByIdAndDelete(...args)
+  ),
 };
 
-export default Url;
+module.exports = Url;

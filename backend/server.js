@@ -1,33 +1,22 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { connectDB, getDbMode } from './config/db.js';
-import {
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const { connectDB, getDbMode } = require('./config/db');
+const {
   buildShortUrl,
   getAllowedDashboardOrigins,
   getAllowedHoldingOrigins,
   getHoldingPageUrl,
   getShortLinkBaseUrl,
-} from './config/env.js';
-import Url from './models/Url.js';
+} = require('./config/env');
+const Url = require('./models/Url');
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 8080;
 
-// Connect Database
-await connectDB();
-
-// ==========================================
-// 1. MIDDLEWARES (Correct Production Order)
-// ==========================================
-
-// Trust reverse proxy headers (Railway/Nginx/Cloudflare)
-// Required for correct req.protocol (HTTP vs HTTPS) and IP logging
 app.set('trust proxy', 1);
 
-// CORS: dashboard (trixam.com) for API; drovashop.com for /api/resolve only
 const dashboardOrigins = getAllowedDashboardOrigins();
 const holdingOrigins = getAllowedHoldingOrigins();
 
@@ -52,15 +41,9 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-// Parse incoming JSON payloads
 app.use(express.json());
-
-// Parse URL-encoded payloads (useful for form submissions)
 app.use(express.urlencoded({ extended: true }));
 
-// ==========================================
-// 2. HELPER FUNCTIONS
-// ==========================================
 function generateShortCode(length = 6) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let code = '';
@@ -115,11 +98,6 @@ async function handleShortCodeRedirect(req, res, shortCode) {
   res.redirect(urlDoc.redirectType || 302, urlDoc.originalUrl);
 }
 
-// ==========================================
-// 3. SYSTEM & HEALTH CHECK ROUTES
-// ==========================================
-
-// Health Check Endpoint (returns 200 OK for Railway/Nginx checks)
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
@@ -127,7 +105,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Root API Endpoint (indicates the server is up)
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'OK',
@@ -135,7 +112,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Early-catch Favicon Endpoint (prevents db queries for favicons)
 app.get('/favicon.ico', (req, res) => {
   res.status(200).type('image/svg+xml').send(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#eab308">
@@ -144,11 +120,6 @@ app.get('/favicon.ico', (req, res) => {
   `);
 });
 
-// ==========================================
-// 4. API ENDPOINTS
-// ==========================================
-
-// GET API Status
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
@@ -156,13 +127,12 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// GET All URLs
 app.get('/api/urls', async (req, res) => {
   try {
     const urls = await Url.find().sort({ createdAt: -1 });
     const baseUrl = getShortLinkBaseUrl(req);
-    
-    const formattedUrls = urls.map(item => ({
+
+    const formattedUrls = urls.map((item) => ({
       _id: item._id,
       originalUrl: item.originalUrl,
       shortCode: item.shortCode,
@@ -170,7 +140,7 @@ app.get('/api/urls', async (req, res) => {
       clicks: item.clicks,
       createdAt: item.createdAt,
     }));
-    
+
     res.json(formattedUrls);
   } catch (error) {
     console.error('Error fetching URLs:', error);
@@ -178,7 +148,6 @@ app.get('/api/urls', async (req, res) => {
   }
 });
 
-// POST Shorten URL
 app.post('/api/shorten', async (req, res) => {
   const { url, customAlias, redirectType, shortCodeLength } = req.body;
 
@@ -188,7 +157,7 @@ app.post('/api/shorten', async (req, res) => {
 
   let targetUrl = url.trim();
   if (!/^https?:\/\//i.test(targetUrl)) {
-    targetUrl = 'https://' + targetUrl;
+    targetUrl = `https://${targetUrl}`;
   }
 
   try {
@@ -206,8 +175,8 @@ app.post('/api/shorten', async (req, res) => {
       const alias = customAlias.trim();
       const aliasRegex = /^[a-zA-Z0-9-_]{3,30}$/;
       if (!aliasRegex.test(alias)) {
-        return res.status(400).json({ 
-          error: 'Custom alias must be between 3 and 30 characters and only contain letters, numbers, hyphens, and underscores.' 
+        return res.status(400).json({
+          error: 'Custom alias must be between 3 and 30 characters and only contain letters, numbers, hyphens, and underscores.',
         });
       }
 
@@ -215,12 +184,12 @@ app.post('/api/shorten', async (req, res) => {
       if (existing) {
         return res.status(400).json({ error: 'Custom alias is already taken. Please choose another one.' });
       }
-      
+
       shortCode = alias;
     } else {
       let isUnique = false;
       let attempts = 0;
-      
+
       while (!isUnique && attempts < 10) {
         shortCode = generateShortCode(parsedLength);
         const existing = await Url.findOne({ shortCode });
@@ -242,7 +211,7 @@ app.post('/api/shorten', async (req, res) => {
     });
 
     const baseUrl = getShortLinkBaseUrl(req);
-    
+
     res.status(201).json({
       _id: newUrl._id,
       originalUrl: newUrl.originalUrl,
@@ -252,14 +221,12 @@ app.post('/api/shorten', async (req, res) => {
       createdAt: newUrl.createdAt,
       redirectType: newUrl.redirectType,
     });
-
   } catch (error) {
     console.error('Error shortening URL:', error);
     res.status(500).json({ error: 'Server error while shortening URL' });
   }
 });
 
-// GET Resolve short code for holding page (no click increment)
 app.get('/api/resolve/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   const { shortCode } = req.params;
 
@@ -279,7 +246,6 @@ app.get('/api/resolve/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   }
 });
 
-// DELETE URL
 app.delete('/api/urls/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -294,11 +260,6 @@ app.delete('/api/urls/:id', async (req, res) => {
   }
 });
 
-// ==========================================
-// 5. REDIRECTION & CATCH-ALL ROUTING
-// ==========================================
-
-// Short-link redirect (production path: /go/:shortCode)
 app.get('/go/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   try {
     await handleShortCodeRedirect(req, res, req.params.shortCode);
@@ -308,7 +269,6 @@ app.get('/go/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   }
 });
 
-// Redirect fallback for local dev (root-level /:shortCode)
 app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   try {
     await handleShortCodeRedirect(req, res, req.params.shortCode);
@@ -318,33 +278,35 @@ app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   }
 });
 
-// JSON Fallback 404 for any other unmatched routes
 app.use((req, res) => {
   res.status(404).json({
     status: 404,
     error: 'Not Found',
-    message: `Cannot ${req.method} ${req.originalUrl}`
+    message: `Cannot ${req.method} ${req.originalUrl}`,
   });
 });
 
-// ==========================================
-// 6. GLOBAL ERROR HANDLING MIDDLEWARE
-// ==========================================
-// Catches all synchronous/asynchronous uncaught exceptions
-// This prevents Express from crashing and returning a 502 Bad Gateway
 app.use((err, req, res, next) => {
   console.error('🔥 Uncaught Global Exception:', err.stack || err);
   res.status(500).json({
     status: 500,
     error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message
+    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message,
   });
 });
 
-// ==========================================
-// 7. START SERVER
-// ==========================================
-// Bound to '0.0.0.0' to ensure proper networking in containers/Railway
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Production server running on port ${PORT} (bound to 0.0.0.0)`);
+async function startServer() {
+  await connectDB();
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Production server running on port ${port} (bound to 0.0.0.0)`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
+
+module.exports = app;

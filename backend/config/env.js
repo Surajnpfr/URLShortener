@@ -9,7 +9,7 @@ function parseOrigins(envValue) {
     .filter(Boolean);
 }
 
-export function getShortLinkBaseUrl(req) {
+function getShortLinkBaseUrl(req) {
   return (
     process.env.SHORT_LINK_BASE_URL ||
     process.env.BASE_URL ||
@@ -17,7 +17,7 @@ export function getShortLinkBaseUrl(req) {
   );
 }
 
-export function getShortLinkPath() {
+function getShortLinkPath() {
   const path = process.env.SHORT_LINK_PATH || '';
   if (!path) {
     return '';
@@ -25,13 +25,13 @@ export function getShortLinkPath() {
   return path.startsWith('/') ? path : `/${path}`;
 }
 
-export function buildShortUrl(baseUrl, shortCode) {
+function buildShortUrl(baseUrl, shortCode) {
   const base = trimTrailingSlash(baseUrl);
   const path = getShortLinkPath();
   return path ? `${base}${path}/${shortCode}` : `${base}/${shortCode}`;
 }
 
-export function getHoldingPageUrl(shortCode) {
+function getHoldingPageUrl(shortCode) {
   const base = process.env.HOLDING_PAGE_BASE_URL;
   if (!base) {
     return null;
@@ -42,15 +42,15 @@ export function getHoldingPageUrl(shortCode) {
   return `${trimTrailingSlash(base)}${normalizedPath}/${shortCode}`;
 }
 
-export function getAllowedHoldingOrigins() {
+function getAllowedHoldingOrigins() {
   return parseOrigins(process.env.ALLOWED_HOLDING_ORIGINS);
 }
 
-export function getAllowedDashboardOrigins() {
+function getAllowedDashboardOrigins() {
   return parseOrigins(process.env.ALLOWED_DASHBOARD_ORIGINS);
 }
 
-export function getShortenerApiBaseUrl(req) {
+function getShortenerApiBaseUrl(req) {
   return (
     process.env.SHORTENER_API_URL ||
     process.env.SHORT_LINK_BASE_URL ||
@@ -58,3 +58,13 @@ export function getShortenerApiBaseUrl(req) {
     `${req.protocol}://${req.get('host')}`
   );
 }
+
+module.exports = {
+  buildShortUrl,
+  getAllowedDashboardOrigins,
+  getAllowedHoldingOrigins,
+  getHoldingPageUrl,
+  getShortLinkBaseUrl,
+  getShortLinkPath,
+  getShortenerApiBaseUrl,
+};
