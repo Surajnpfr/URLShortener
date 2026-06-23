@@ -173,7 +173,7 @@ export default function AccountSettingsPage({ onNavigate, onLogout }) {
       <section className="settings-flat-section">
         <h3 className="settings-flat-heading">Security</h3>
         <Typography.Text type="secondary">
-          Password changes are not available in-app yet. Contact support if you need help with your account.
+          Password and account security are managed through Auth0.
         </Typography.Text>
       </section>
 

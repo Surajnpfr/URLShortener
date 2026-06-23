@@ -1,9 +1,29 @@
-// In dev, call the API directly on :5000 (session cookies are host-scoped to localhost).
+// In dev, call the API directly on :5000 (Auth0 session cookies are on the API host).
 // In production, set VITE_API_URL to your API host (e.g. https://app.drovashop.com).
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 export function getApiBaseUrl() {
   return API_BASE_URL;
+}
+
+function buildAuthUrl(path, returnPath = '/dashboard') {
+  const returnTo = encodeURIComponent(`${window.location.origin}${returnPath}`);
+  const base = API_BASE_URL.replace(/\/$/, '');
+  return `${base}${path}?returnTo=${returnTo}`;
+}
+
+export function getAuthLoginUrl(returnPath = '/dashboard') {
+  return buildAuthUrl('/login', returnPath);
+}
+
+export function getAuthSignupUrl(returnPath = '/dashboard') {
+  return buildAuthUrl('/signup', returnPath);
+}
+
+export function getAuthLogoutUrl() {
+  const returnTo = encodeURIComponent(window.location.origin);
+  const base = API_BASE_URL.replace(/\/$/, '');
+  return `${base}/logout?returnTo=${returnTo}`;
 }
 
 export async function apiFetch(path, options = {}) {

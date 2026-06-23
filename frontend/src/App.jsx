@@ -11,8 +11,8 @@ import TermsPage from './components/TermsPage';
 import PrivacyPage from './components/PrivacyPage';
 import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
-import { getApiBaseUrl } from './lib/api';
-import { deleteUrl, fetchUrls, fetchCurrentUser, logoutUser } from './lib/urlApi';
+import { getApiBaseUrl, getAuthLoginUrl, getAuthSignupUrl, getAuthLogoutUrl } from './lib/api';
+import { deleteUrl, fetchUrls, fetchCurrentUser } from './lib/urlApi';
 import {
   getRoute,
   isPrivacyPath,
@@ -140,12 +140,9 @@ export default function App() {
   };
 
   const openAuth = (mode) => {
-    navigate(mode === 'signup' ? '/register' : '/login');
-  };
-
-  const handleAuthSuccess = (user) => {
-    setAppUser(user);
-    setIsAuthenticated(true);
+    window.location.href = mode === 'signup'
+      ? getAuthSignupUrl('/dashboard')
+      : getAuthLoginUrl('/dashboard');
   };
 
   // Apply theme to document element
@@ -210,20 +207,11 @@ export default function App() {
     setQrModalOpen(true);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (!window.confirm('Are you sure you want to log out?')) {
       return;
     }
-
-    try {
-      await logoutUser();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-
-    setAppUser(null);
-    setIsAuthenticated(false);
-    navigate('/', { replace: true });
+    window.location.href = getAuthLogoutUrl();
   };
 
   // Upgrade checkout billing handler
@@ -320,7 +308,7 @@ export default function App() {
         ) : isPrivacyPath(location.pathname) ? (
           <PrivacyPage onNavigate={navigate} />
         ) : showAuthPage ? (
-          <LoginPage mode={currentRoute.authMode} onAuthSuccess={handleAuthSuccess} />
+          <LoginPage mode={currentRoute.authMode} />
         ) : isAuthenticated ? (
           /* Logged-in: dashboard only */
           <section id="dashboard-section" className="container dashboard-page-section">

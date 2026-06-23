@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const { connectDB, getDbMode } = require('./config/db');
-const { createSessionMiddleware } = require('./config/session');
+const { createAuth0Middleware, getMissingAuth0Config } = require('./config/auth0Session');
 const {
   buildShortUrl,
   getAllowedDashboardOrigins,
@@ -49,11 +49,46 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-const sessionMiddleware = createSessionMiddleware();
-if (sessionMiddleware) {
-  app.use(sessionMiddleware);
+const auth0Middleware = createAuth0Middleware();
+if (auth0Middleware) {
+  app.use(auth0Middleware);
+
+  app.get('/signup', (req, res) => {
+    res.oidc.login({
+      returnTo: req.query.returnTo || undefined,
+      authorizationParams: { screen_hint: 'signup' },
+    });
+  });
+
+  app.get('/login', (req, res) => {
+    if (req.oidc.isAuthenticated()) {
+      const returnTo = req.query.returnTo;
+      if (returnTo) {
+        return res.redirect(returnTo);
+      }
+      return res.redirect(process.env.FRONTEND_URL || '/');
+    }
+
+    res.oidc.login({
+      returnTo: req.query.returnTo || undefined,
+    });
+  });
 } else {
-  console.warn('API auth routes require SECRET in backend/.env');
+  const authNotConfiguredHandler = (req, res) => {
+    const missing = getMissingAuth0Config();
+    res.status(503).json({
+      error: 'Auth0 is not configured on the server',
+      missing,
+      message: missing.length > 0
+        ? `Add these to backend/.env and restart the API: ${missing.join(', ')}`
+        : 'Set Auth0 variables in backend/.env, then restart the API.',
+    });
+  };
+
+  app.get('/login', authNotConfiguredHandler);
+  app.get('/signup', authNotConfiguredHandler);
+  app.get('/callback', authNotConfiguredHandler);
+  app.get('/logout', authNotConfiguredHandler);
 }
 
 app.use(express.json());

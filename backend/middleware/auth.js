@@ -1,25 +1,39 @@
 const User = require('../models/User');
 
-async function loadUserFromSession(req) {
-  const userId = req.session?.userId;
-  if (!userId) return null;
+async function syncUserFromOidc(req) {
+  const oidcUser = req.oidc?.user;
 
-  return User.findById(userId);
+  if (!oidcUser?.sub) {
+    throw new Error('Missing Auth0 subject');
+  }
+
+  const auth0Id = oidcUser.sub;
+  const email = oidcUser.email || `${auth0Id}@users.auth0`;
+  const name = oidcUser.name || oidcUser.nickname || '';
+
+  const user = await User.findOneAndUpdate(
+    { auth0Id },
+    {
+      $set: { email, name },
+      $setOnInsert: { plan: 'Free', createdAt: new Date() },
+    },
+    { upsert: true, new: true },
+  );
+
+  req.user = user;
 }
 
-async function requireAuth(req, res, next) {
-  try {
-    const user = await loadUserFromSession(req);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    req.user = user;
-    return next();
-  } catch (error) {
-    console.error('Failed to load user session:', error);
-    return res.status(500).json({ error: 'Failed to load user session' });
+function requireAuth(req, res, next) {
+  if (!req.oidc?.isAuthenticated()) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  return syncUserFromOidc(req)
+    .then(() => next())
+    .catch((error) => {
+      console.error('Failed to sync user:', error);
+      return res.status(500).json({ error: 'Failed to sync user account' });
+    });
 }
 
 function formatUserResponse(user) {
@@ -36,5 +50,5 @@ function formatUserResponse(user) {
 module.exports = {
   requireAuth,
   formatUserResponse,
-  loadUserFromSession,
+  syncUserFromOidc,
 };

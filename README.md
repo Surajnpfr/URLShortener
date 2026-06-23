@@ -85,31 +85,37 @@ Redirect to Original URL
 
 GET /:shortCode
 
-## Authentication (email + password)
+## Auth0 setup (Regular Web Application)
 
-Session-based auth with `express-session` and `bcryptjs`. No third-party OAuth required.
+This project uses the [Auth0 Express SDK](https://github.com/auth0/express-openid-connect) with **server-side sessions**. Users sign in with **email and password** on Auth0 Universal Login (enable the Database connection; disable Google/social if you only want email/password).
 
-1. Copy `backend/.env.example` → `backend/.env`
-2. Set `SECRET` — generate with: `openssl rand -hex 32`
-3. Set `DATABASE_URL`, `BASE_URL`, `FRONTEND_URL`, and CORS origins (see `backend/.env.example`)
-4. For production frontend builds, copy `frontend/.env.production.example` → `frontend/.env.production` and set `VITE_API_URL`
+1. In Auth0 Dashboard → **Applications**, use a **Regular Web Application**.
+   - **Token Endpoint Authentication Method:** `POST` (`client_secret_post`)
+   - **Allowed Callback URLs:** `http://localhost:5000/callback`, `https://app.drovashop.com/callback`
+   - **Allowed Logout URLs:** `http://localhost:5173`, `https://drovashop.com`, `https://www.drovashop.com`
+2. Copy **Client ID** and **Client Secret** into `backend/.env` (never commit secrets).
+3. Set backend env vars (see `backend/.env.example`):
+   - `ISSUER_BASE_URL=https://nerdy.jp.auth0.com`
+   - `CLIENT_ID`, `CLIENT_SECRET`, `SECRET`, `BASE_URL`, `FRONTEND_URL`
+4. Generate a session secret: `openssl rand -hex 32` → `SECRET`
+5. Set `VITE_API_URL` in `frontend/.env.production` for production builds
+6. Ensure `ALLOWED_DASHBOARD_ORIGINS` includes the React app origin
 
-### Auth API routes
+### Auth routes (Express + Auth0 SDK)
 
-- `POST /api/auth/register` — create account
-- `POST /api/auth/login` — sign in (sets session cookie)
-- `POST /api/auth/logout` — sign out
-- `GET /api/auth/me` — current user profile
-- `PATCH /api/auth/me` — update display name
+- `GET /login` — start login (supports `?returnTo=` full frontend URL)
+- `GET /signup` — start signup (`screen_hint=signup`)
+- `GET /logout` — end session (supports `?returnTo=`)
+- `GET /callback` — Auth0 OAuth callback (automatic)
 
 ### Protected API routes (session cookie)
 
+- `GET /api/auth/me` — current user profile
+- `PATCH /api/auth/me` — update display name
 - `GET /api/urls`, `POST /api/shorten`, `DELETE /api/urls/:id`
 - `GET /api/analytics/summary`, `GET /api/analytics/links/:urlId`
 
 Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`
-
-Frontend login UI: `/login` and `/register`
 
 🎯 Roadmap
 
@@ -117,7 +123,7 @@ Frontend login UI: `/login` and `/register`
 - [x] Custom aliases
 - [x] QR code generation
 - [x] Click analytics
-- [x] User authentication (email / password sessions)
+- [x] User authentication (Auth0 email/password)
 - [x] Dashboard for link management
 - [ ] Link expiration support
 - [ ] Rate limiting and abuse protection

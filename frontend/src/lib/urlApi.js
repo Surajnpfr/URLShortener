@@ -35,29 +35,6 @@ export async function fetchCurrentUser() {
   return readJson(response);
 }
 
-export async function loginUser({ email, password }) {
-  const response = await apiFetch('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-  return readJson(response);
-}
-
-export async function registerUser({ email, password, name }) {
-  const response = await apiFetch('/api/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password, name }),
-  });
-  return readJson(response);
-}
-
-export async function logoutUser() {
-  const response = await apiFetch('/api/auth/logout', {
-    method: 'POST',
-  });
-  return readJson(response);
-}
-
 export async function updateCurrentUserName(name) {
   const response = await apiFetch('/api/auth/me', {
     method: 'PATCH',
