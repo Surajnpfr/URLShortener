@@ -1,13 +1,38 @@
 const express = require('express');
 const User = require('../models/User');
-const { requireAuth, formatUserResponse } = require('../middleware/auth');
+const { requireAuth, formatUserResponse, syncUserFromOidc } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/me', requireAuth, (req, res) => {
+router.get('/session', (req, res) => {
   res.json({
-    user: formatUserResponse(req.user),
+    authenticated: Boolean(req.oidc?.isAuthenticated()),
   });
+});
+
+router.get('/me', async (req, res) => {
+  if (!req.oidc?.isAuthenticated()) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    await syncUserFromOidc(req);
+    return res.json({
+      user: formatUserResponse(req.user),
+    });
+  } catch (error) {
+    console.error('Failed to sync user (returning Auth0 profile):', error);
+    const oidcUser = req.oidc.user || {};
+    return res.json({
+      user: {
+        email: oidcUser.email || '',
+        name: oidcUser.name || oidcUser.nickname || '',
+        fullName: oidcUser.name || oidcUser.nickname || '',
+        plan: 'Free',
+      },
+      degraded: true,
+    });
+  }
 });
 
 router.patch('/me', requireAuth, async (req, res) => {

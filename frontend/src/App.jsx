@@ -11,7 +11,7 @@ import TermsPage from './components/TermsPage';
 import PrivacyPage from './components/PrivacyPage';
 import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
-import { getApiBaseUrl, getAuthLoginUrl, getAuthSignupUrl, getAuthLogoutUrl } from './lib/api';
+import { getApiBaseUrl, getAuthLoginUrl, getAuthSignupUrl, getAuthLogoutUrl, apiFetch, readJson } from './lib/api';
 import { deleteUrl, fetchUrls, fetchCurrentUser } from './lib/urlApi';
 import {
   getRoute,
@@ -25,6 +25,7 @@ import {
 } from './router';
 
 const API_BASE_URL = getApiBaseUrl();
+const AUTH_LOOP_KEY = 'linkly_auth_loop';
 
 const PANEL_TITLES = {
   dashboard: 'Dashboard',
@@ -40,6 +41,7 @@ export default function App() {
   const [appUser, setAppUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem('theme');
     return stored === 'dark' ? 'dark' : 'light';
@@ -61,9 +63,20 @@ export default function App() {
 
   const checkSession = useCallback(async () => {
     try {
+      const sessionResponse = await apiFetch('/api/auth/session');
+      const sessionData = await readJson(sessionResponse);
+
+      if (!sessionData.authenticated) {
+        setAppUser(null);
+        setIsAuthenticated(false);
+        return false;
+      }
+
       const userData = await fetchCurrentUser();
       setAppUser(userData.user);
       setIsAuthenticated(true);
+      setAuthError(null);
+      sessionStorage.removeItem(AUTH_LOOP_KEY);
       return true;
     } catch {
       setAppUser(null);
@@ -116,7 +129,18 @@ export default function App() {
     }
 
     if (!isAuthenticated && nextRoute.tab) {
-      navigate('/login', { replace: true });
+      const attempts = Number(sessionStorage.getItem(AUTH_LOOP_KEY) || 0) + 1;
+      sessionStorage.setItem(AUTH_LOOP_KEY, String(attempts));
+
+      if (attempts > 2) {
+        setAuthError(
+          'Sign-in succeeded on the server, but this page could not verify your session. Rebuild the frontend with VITE_API_URL set to your API host, and ensure ALLOWED_DASHBOARD_ORIGINS on the API includes this site.',
+        );
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      window.location.replace(getAuthLoginUrl(location.pathname || '/dashboard'));
       return;
     }
 
@@ -308,7 +332,11 @@ export default function App() {
         ) : isPrivacyPath(location.pathname) ? (
           <PrivacyPage onNavigate={navigate} />
         ) : showAuthPage ? (
-          <LoginPage mode={currentRoute.authMode} />
+          <LoginPage mode={currentRoute.authMode} authError={authError} onRetryAuth={() => {
+            setAuthError(null);
+            sessionStorage.removeItem(AUTH_LOOP_KEY);
+            openAuth(currentRoute.authMode === 'signup' ? 'signup' : 'login');
+          }} />
         ) : isAuthenticated ? (
           /* Logged-in: dashboard only */
           <section id="dashboard-section" className="container dashboard-page-section">

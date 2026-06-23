@@ -2,6 +2,12 @@
 // In production, set VITE_API_URL to your API host (e.g. https://app.drovashop.com).
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
+if (!import.meta.env.DEV && !API_BASE_URL) {
+  console.error(
+    'VITE_API_URL is not set. Rebuild the frontend with VITE_API_URL pointing at your API host (e.g. https://app.drovashop.com).',
+  );
+}
+
 export function getApiBaseUrl() {
   return API_BASE_URL;
 }

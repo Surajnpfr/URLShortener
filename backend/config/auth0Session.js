@@ -1,8 +1,51 @@
 const { auth } = require('express-openid-connect');
+const { getAllowedDashboardOrigins } = require('./env');
 
 function getDefaultReturnTo() {
   const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
   return `${frontend.replace(/\/$/, '')}/dashboard`;
+}
+
+function getSessionCookieOptions(baseURL) {
+  const isHttps = String(baseURL).startsWith('https://');
+  const cookie = {
+    sameSite: isHttps ? 'None' : 'Lax',
+    secure: isHttps,
+  };
+
+  if (isHttps) {
+    try {
+      const hostname = new URL(baseURL).hostname;
+      const parts = hostname.split('.');
+      if (parts.length >= 2 && !hostname.endsWith('localhost')) {
+        cookie.domain = `.${parts.slice(-2).join('.')}`;
+      }
+    } catch {
+      // ignore invalid BASE_URL
+    }
+  }
+
+  return cookie;
+}
+
+function isAllowedReturnTo(returnTo) {
+  if (!returnTo || typeof returnTo !== 'string') {
+    return false;
+  }
+
+  try {
+    const target = new URL(returnTo);
+    const allowedOrigins = new Set(getAllowedDashboardOrigins());
+
+    const frontendUrl = process.env.FRONTEND_URL;
+    if (frontendUrl) {
+      allowedOrigins.add(new URL(frontendUrl).origin);
+    }
+
+    return allowedOrigins.has(target.origin);
+  } catch {
+    return false;
+  }
 }
 
 function getMissingAuth0Config() {
@@ -28,8 +71,6 @@ function createAuth0Middleware() {
     return null;
   }
 
-  const isHttps = String(baseURL).startsWith('https://');
-
   return auth({
     authRequired: false,
     auth0Logout: true,
@@ -46,14 +87,14 @@ function createAuth0Middleware() {
       scope: 'openid profile email',
     },
     getLoginState(req) {
-      const returnTo = req.query.returnTo || getDefaultReturnTo();
+      const requested = req.query.returnTo;
+      const returnTo = requested && isAllowedReturnTo(requested)
+        ? requested
+        : getDefaultReturnTo();
       return { returnTo };
     },
     session: {
-      cookie: {
-        sameSite: isHttps ? 'None' : 'Lax',
-        secure: isHttps,
-      },
+      cookie: getSessionCookieOptions(baseURL),
     },
   });
 }
@@ -62,4 +103,5 @@ module.exports = {
   createAuth0Middleware,
   getDefaultReturnTo,
   getMissingAuth0Config,
+  isAllowedReturnTo,
 };

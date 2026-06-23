@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const { connectDB, getDbMode } = require('./config/db');
-const { createAuth0Middleware, getMissingAuth0Config } = require('./config/auth0Session');
+const { createAuth0Middleware, getMissingAuth0Config, isAllowedReturnTo } = require('./config/auth0Session');
 const {
   buildShortUrl,
   getAllowedDashboardOrigins,
@@ -63,7 +63,7 @@ if (auth0Middleware) {
   app.get('/login', (req, res) => {
     if (req.oidc.isAuthenticated()) {
       const returnTo = req.query.returnTo;
-      if (returnTo) {
+      if (returnTo && isAllowedReturnTo(returnTo)) {
         return res.redirect(returnTo);
       }
       return res.redirect(process.env.FRONTEND_URL || '/');
