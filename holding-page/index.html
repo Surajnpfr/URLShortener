@@ -3,187 +3,664 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Redirecting...</title>
+  <title>Hamro Niti</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0b0f19;
-      color: #f3f4f6;
+      background: #fff;
+      color: #1e293b;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 16px;
     }
-    .container { width: 100%; max-width: 720px; }
-    .ad-slot {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px dashed rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
-      min-height: 90px;
+    a { color: inherit; text-decoration: none; }
+    .site-header {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 28px 20px 16px;
+      text-align: center;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .logo {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 18px;
+      display: inline-block;
+    }
+    .logo-hamro { color: #1e3a5f; }
+    .logo-niti { color: #e85d04; }
+    .site-nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+    .site-nav a:hover { color: #e85d04; }
+
+    .page-wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    .loading-card, .error-card {
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(232, 93, 4, 0.2);
+      border-top-color: #e85d04;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+    .error-title { color: #dc2626; font-size: 1.5rem; margin-bottom: 8px; }
+    .muted { color: #64748b; line-height: 1.6; }
+
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .author-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .author-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #e85d04;
+      color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #6b7280;
       font-size: 0.85rem;
-      margin-bottom: 20px;
+      font-weight: 700;
+      flex-shrink: 0;
     }
-    .card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 32px 24px;
+    .author-name { font-weight: 600; color: #1e293b; font-size: 0.95rem; }
+    .meta-line { color: #94a3b8; font-size: 0.85rem; margin-top: 2px; }
+
+    .hero-wrap {
+      position: relative;
+      margin-bottom: 28px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #f1f5f9;
+    }
+    .hero-img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+    }
+    .hero-placeholder {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1e3a5f 0%, #e85d04 100%);
+      color: rgba(255,255,255,0.9);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .category-pill {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: #e85d04;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 6px 12px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    .article-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.6rem, 4vw, 2.15rem);
+      line-height: 1.25;
+      color: #1e3a5f;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .article-body {
+      font-size: 1.05rem;
+      line-height: 1.75;
+      color: #334155;
+    }
+    .article-body p { margin-bottom: 1.25rem; }
+    .article-body h2,
+    .article-body h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      color: #1e3a5f;
+      margin: 1.75rem 0 0.75rem;
+      line-height: 1.3;
+    }
+    .article-body h2 { font-size: 1.35rem; }
+    .article-body h3 { font-size: 1.15rem; }
+    .article-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+    .article-body a { color: #e85d04; text-decoration: underline; }
+
+    .redirect-box {
+      margin: 32px 0;
+      padding: 28px 24px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #e85d04;
+      border-radius: 8px;
       text-align: center;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 8px; }
-    p { color: #9ca3af; line-height: 1.6; margin-bottom: 20px; }
+    .redirect-box h2 {
+      font-size: 1.05rem;
+      color: #1e3a5f;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .redirect-box p {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-bottom: 16px;
+    }
     .countdown {
-      font-size: 2.5rem;
+      font-size: 2.75rem;
       font-weight: 700;
-      color: #8b5cf6;
-      margin: 16px 0;
+      color: #e85d04;
+      line-height: 1;
+      margin-bottom: 16px;
     }
     .continue-btn {
       display: inline-block;
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-      color: white;
+      background: #1e3a5f;
+      color: #fff;
       border: none;
-      padding: 14px 32px;
-      border-radius: 8px;
-      font-size: 1rem;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-size: 0.95rem;
       font-weight: 600;
-      cursor: pointer;
-      opacity: 0.4;
-      pointer-events: none;
-      transition: opacity 0.2s;
+      cursor: not-allowed;
+      opacity: 0.45;
+      transition: opacity 0.2s, background 0.2s;
     }
     .continue-btn.enabled {
       opacity: 1;
-      pointer-events: auto;
+      cursor: pointer;
     }
-    .continue-btn.enabled:hover { opacity: 0.9; }
-    .error { color: #f87171; }
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid rgba(139, 92, 246, 0.2);
-      border-top-color: #8b5cf6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
+    .continue-btn.enabled:hover { background: #16304f; }
+
+    .read-full {
+      display: inline-block;
+      margin-top: 24px;
+      color: #e85d04;
+      font-weight: 600;
+      font-size: 0.95rem;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .hidden { display: none; }
+    .read-full:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="ad-slot" id="ad-top">
-      <!-- Replace with your ad code (e.g. Google AdSense) -->
-      Advertisement
-    </div>
+  <header class="site-header">
+    <a href="https://hamroniti.com" class="logo">
+      <span class="logo-hamro">Hamro</span><span class="logo-niti">Niti</span>
+    </a>
+    <nav class="site-nav">
+      <a href="https://hamroniti.com">Home</a>
+      <a href="https://hamroniti.com/privacy-policy/">Privacy Policy</a>
+      <a href="https://hamroniti.com/terms-and-conditions/">Terms and Conditions</a>
+      <a href="https://hamroniti.com/about-us/">About Us</a>
+    </nav>
+  </header>
 
-    <div class="card" id="loading-state">
+  <main class="page-wrap">
+    <div id="loading-state" class="loading-card">
       <div class="spinner"></div>
-      <h1>Preparing your link</h1>
-      <p>Please wait while we verify the destination...</p>
+      <p class="muted">Loading article...</p>
     </div>
 
-    <div class="card hidden" id="holding-state">
-      <h1>You are being redirected</h1>
-      <p>Your destination will open in a moment. Thank you for your patience.</p>
-      <div class="countdown" id="countdown">5</div>
-      <button class="continue-btn" id="continue-btn" type="button">Continue to destination</button>
+    <div id="error-state" class="error-card hidden">
+      <h1 class="error-title">Link Not Found</h1>
+      <p class="muted" id="error-message">The shortened link you are trying to access does not exist or has expired.</p>
     </div>
 
-    <div class="card hidden" id="error-state">
-      <h1 class="error">Link Not Found</h1>
-      <p id="error-message">The shortened link you are trying to access does not exist or has expired.</p>
-    </div>
+    <article id="article-view" class="hidden">
+      <div class="article-meta">
+        <div class="author-row">
+          <div class="author-avatar" id="author-avatar">HN</div>
+          <div>
+            <div class="author-name" id="author-name">Hamro Niti</div>
+            <div class="meta-line" id="meta-line"></div>
+          </div>
+        </div>
+      </div>
 
-    <div class="ad-slot" id="ad-bottom" style="margin-top: 20px;">
-      <!-- Replace with your ad code (e.g. Google AdSense) -->
-      Advertisement
-    </div>
-  </div>
+      <div class="hero-wrap" id="hero-wrap">
+        <span class="category-pill hidden" id="category-pill">Article</span>
+        <img class="hero-img hidden" id="hero-img" alt="">
+        <div class="hero-placeholder hidden" id="hero-placeholder">Hamro Niti</div>
+      </div>
+
+      <h1 class="article-title" id="article-title"></h1>
+      <div class="article-body" id="article-body"></div>
+
+      <a class="read-full hidden" id="read-full-link" href="#" target="_blank" rel="noopener noreferrer">
+        Read the full article on Hamro Niti →
+      </a>
+    </article>
+  </main>
 
   <script>
     window.HOLDING_PAGE_CONFIG = {
-      shortenerApiUrl: 'https://app.trixam.com',
-      countdownSeconds: 5,
+      shortenerApiUrl: 'https://app.drovashop.com',
+      wordpressFeedUrl: 'https://hamroniti.com/feed/',
+      countdownSeconds: 7,
     };
   </script>
   <script>
     (function () {
       const config = window.HOLDING_PAGE_CONFIG || {};
-      const countdownSeconds = config.countdownSeconds || 5;
+      const countdownSeconds = config.countdownSeconds || 7;
       const apiBase = (config.shortenerApiUrl || '').replace(/\/$/, '');
+      const feedUrl = config.wordpressFeedUrl || `${window.location.origin}/feed/`;
 
       const loadingState = document.getElementById('loading-state');
-      const holdingState = document.getElementById('holding-state');
       const errorState = document.getElementById('error-state');
-      const countdownEl = document.getElementById('countdown');
-      const continueBtn = document.getElementById('continue-btn');
+      const articleView = document.getElementById('article-view');
       const errorMessage = document.getElementById('error-message');
+      const articleBody = document.getElementById('article-body');
+      const readFullLink = document.getElementById('read-full-link');
 
       const pathParts = window.location.pathname.split('/').filter(Boolean);
-      const shortCode = pathParts[pathParts.length - 1];
+      let shortCode = pathParts[pathParts.length - 1] || '';
+      if (shortCode === 'index.html') shortCode = '';
 
-      if (!shortCode || !apiBase) {
-        showError('Invalid link configuration.');
+      if (!/^[a-zA-Z0-9-_]{3,30}$/.test(shortCode) || !apiBase) {
+        showError('Invalid link. Use a shortened link like hamroniti.com/r/your-code');
         return;
       }
 
       let destinationUrl = null;
-      let redirectType = 302;
       let remaining = countdownSeconds;
       let timerId = null;
+      let countdownBox = null;
 
-      continueBtn.addEventListener('click', () => {
-        if (destinationUrl) {
-          window.location.href = destinationUrl;
-        }
-      });
+      loadRandomFullArticle();
+      resolveShortLink();
 
       function showError(message) {
         loadingState.classList.add('hidden');
-        holdingState.classList.add('hidden');
+        articleView.classList.add('hidden');
         errorState.classList.remove('hidden');
         errorMessage.textContent = message;
       }
 
-      function showHolding() {
+      function showArticle() {
         loadingState.classList.add('hidden');
-        holdingState.classList.remove('hidden');
+        articleView.classList.remove('hidden');
+      }
+
+      function createCountdownBox() {
+        const box = document.createElement('div');
+        box.className = 'redirect-box';
+        box.id = 'redirect-box';
+        box.innerHTML = `
+          <h2>You will be redirected shortly</h2>
+          <p id="redirect-hint">Please wait <strong>${countdownSeconds}</strong> seconds, then click continue.</p>
+          <div class="countdown" id="countdown">${countdownSeconds}</div>
+          <button class="continue-btn" id="continue-btn" type="button" disabled>Continue to destination</button>
+        `;
+        box.querySelector('#continue-btn').addEventListener('click', () => {
+          if (destinationUrl && box.querySelector('#continue-btn').classList.contains('enabled')) {
+            window.location.href = destinationUrl;
+          }
+        });
+        return box;
+      }
+
+      function startCountdown() {
+        if (!countdownBox || timerId) return;
+
+        const countdownEl = countdownBox.querySelector('#countdown');
+        const continueBtn = countdownBox.querySelector('#continue-btn');
+        const hintEl = countdownBox.querySelector('#redirect-hint');
+
+        remaining = countdownSeconds;
         countdownEl.textContent = String(remaining);
+
         timerId = setInterval(() => {
           remaining -= 1;
           countdownEl.textContent = String(Math.max(remaining, 0));
+
           if (remaining <= 0) {
             clearInterval(timerId);
+            continueBtn.disabled = false;
             continueBtn.classList.add('enabled');
-            continueBtn.textContent = 'Continue to destination';
-            if (destinationUrl) {
-              window.location.href = destinationUrl;
-            }
+            hintEl.textContent = 'Ready! Click the button below to go to your destination.';
           }
         }, 1000);
       }
 
-      fetch(`${apiBase}/api/resolve/${encodeURIComponent(shortCode)}`)
-        .then(async (res) => {
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(data.error || 'Shortened URL not found');
-          }
-          destinationUrl = data.originalUrl;
-          redirectType = data.redirectType || 302;
-          showHolding();
-        })
-        .catch((err) => {
-          showError(err.message || 'Unable to resolve this link.');
+      function injectCountdownIntoArticle(bodyEl) {
+        countdownBox = createCountdownBox();
+        const blocks = bodyEl.querySelectorAll('p, h2, h3, h4');
+        if (blocks.length === 0) {
+          bodyEl.appendChild(countdownBox);
+          return;
+        }
+        const mid = Math.floor(blocks.length / 2);
+        blocks[mid].after(countdownBox);
+      }
+
+      function cleanArticleHtml(container) {
+        const removeSelectors = [
+          'form',
+          'script',
+          'style',
+          '.comments-area',
+          '#respond',
+          '.comment-respond',
+          '.post-navigation',
+          '.sharedaddy',
+          '.jp-relatedposts',
+          '[class*="newsletter"]',
+          '[class*="subscribe"]',
+          '[id*="subscribe"]',
+        ];
+        removeSelectors.forEach((sel) => {
+          container.querySelectorAll(sel).forEach((el) => el.remove());
         });
+      }
+
+      function findArticleContent(doc) {
+        const selectors = [
+          '.entry-content',
+          '.post-content',
+          '.elementor-widget-theme-post-content .elementor-widget-container',
+          'article .wp-block-post-content',
+          'article.post',
+          'main article',
+          'article',
+        ];
+        for (let i = 0; i < selectors.length; i += 1) {
+          const el = doc.querySelector(selectors[i]);
+          if (el && el.innerHTML.trim().length > 100) {
+            return el;
+          }
+        }
+        return null;
+      }
+
+      function findFeaturedImage(doc) {
+        const selectors = [
+          'article img.wp-post-image',
+          '.post-thumbnail img',
+          '.featured-image img',
+          'meta[property="og:image"]',
+        ];
+        for (let i = 0; i < selectors.length - 1; i += 1) {
+          const img = doc.querySelector(selectors[i]);
+          if (img && img.src) return img.src;
+        }
+        const og = doc.querySelector('meta[property="og:image"]');
+        return og ? og.getAttribute('content') : null;
+      }
+
+      function findTitle(doc) {
+        const el = doc.querySelector(
+          'h1.entry-title, h1.wp-block-post-title, article h1, .post-title h1, h1'
+        );
+        return el ? el.textContent.trim() : '';
+      }
+
+      function findAuthor(doc) {
+        const el = doc.querySelector(
+          '.author-name, .entry-author a, .post-author a, [rel="author"]'
+        );
+        return el ? el.textContent.trim() : 'Hamro Niti';
+      }
+
+      function findCategory(doc) {
+        const el = doc.querySelector(
+          '.category a, .entry-category a, .post-categories a, a[rel="category tag"]'
+        );
+        return el ? el.textContent.trim() : '';
+      }
+
+      function getInitials(name) {
+        return (name || 'HN')
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0].toUpperCase())
+          .join('') || 'HN';
+      }
+
+      function setHeroImage(src, alt) {
+        const heroWrap = document.getElementById('hero-wrap');
+        const heroImg = document.getElementById('hero-img');
+        const heroPlaceholder = document.getElementById('hero-placeholder');
+        if (!src) {
+          heroWrap.classList.add('hidden');
+          return;
+        }
+        heroWrap.classList.remove('hidden');
+        heroImg.src = src;
+        heroImg.alt = alt || '';
+        heroImg.classList.remove('hidden');
+        heroPlaceholder.classList.add('hidden');
+      }
+
+      function mountFullArticleFromDocument(doc, article) {
+        const contentEl = findArticleContent(doc);
+        if (!contentEl) {
+          throw new Error('Article content not found');
+        }
+
+        const title = findTitle(doc) || article.title;
+        const author = findAuthor(doc) || article.author;
+        const category = findCategory(doc) || article.category;
+        const image = findFeaturedImage(doc) || article.image;
+
+        document.getElementById('author-avatar').textContent = getInitials(author);
+        document.getElementById('author-name').textContent = author;
+        document.getElementById('meta-line').textContent = [
+          article.dateLabel,
+          article.readTime,
+        ].filter(Boolean).join(' · ');
+
+        const categoryPill = document.getElementById('category-pill');
+        if (category) {
+          categoryPill.textContent = category.toUpperCase();
+          categoryPill.classList.remove('hidden');
+        }
+
+        document.getElementById('article-title').textContent = title;
+        setHeroImage(image, title);
+
+        articleBody.innerHTML = contentEl.innerHTML;
+        cleanArticleHtml(articleBody);
+        injectCountdownIntoArticle(articleBody);
+
+        readFullLink.href = article.link;
+        readFullLink.classList.remove('hidden');
+        showArticle();
+        startCountdown();
+      }
+
+      function mountFallbackArticle(article) {
+        document.getElementById('author-avatar').textContent = getInitials(article.author);
+        document.getElementById('author-name').textContent = article.author;
+        document.getElementById('meta-line').textContent = [
+          article.dateLabel,
+          article.readTime,
+        ].filter(Boolean).join(' · ');
+
+        if (article.category) {
+          const categoryPill = document.getElementById('category-pill');
+          categoryPill.textContent = article.category.toUpperCase();
+          categoryPill.classList.remove('hidden');
+        }
+
+        document.getElementById('article-title').textContent = article.title;
+        setHeroImage(article.image, article.title);
+
+        const parts = article.excerpt.split(/(?<=[.!?])\s+/);
+        const mid = Math.max(1, Math.ceil(parts.length / 2));
+        const lead = parts.slice(0, mid).join(' ');
+        const rest = parts.slice(mid).join(' ');
+
+        articleBody.innerHTML = `
+          <p>${escapeHtml(lead)}</p>
+          <p>${escapeHtml(rest)}</p>
+        `;
+        injectCountdownIntoArticle(articleBody);
+
+        readFullLink.href = article.link;
+        readFullLink.classList.remove('hidden');
+        showArticle();
+        startCountdown();
+      }
+
+      function loadFullArticleInIframe(article) {
+        return new Promise((resolve, reject) => {
+          const iframe = document.createElement('iframe');
+          iframe.setAttribute('aria-hidden', 'true');
+          iframe.tabIndex = -1;
+          iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+          iframe.src = article.link;
+
+          iframe.onload = () => {
+            try {
+              const doc = iframe.contentDocument || iframe.contentWindow.document;
+              if (!doc) throw new Error('No iframe document');
+              mountFullArticleFromDocument(doc, article);
+              iframe.remove();
+              resolve();
+            } catch (err) {
+              iframe.remove();
+              reject(err);
+            }
+          };
+
+          iframe.onerror = () => {
+            iframe.remove();
+            reject(new Error('Iframe load failed'));
+          };
+
+          document.body.appendChild(iframe);
+        });
+      }
+
+      function stripHtml(html) {
+        const el = document.createElement('div');
+        el.innerHTML = html || '';
+        return (el.textContent || el.innerText || '').trim();
+      }
+
+      function escapeHtml(text) {
+        const el = document.createElement('div');
+        el.textContent = text || '';
+        return el.innerHTML;
+      }
+
+      function formatDate(dateStr) {
+        const date = new Date(dateStr);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      }
+
+      function estimateReadTime(text) {
+        const words = (text || '').split(/\s+/).filter(Boolean).length;
+        return `${Math.max(1, Math.round(words / 200))} min read`;
+      }
+
+      function extractImage(html) {
+        const match = (html || '').match(/<img[^>]+src=["']([^"']+)["']/i);
+        return match ? match[1] : null;
+      }
+
+      function parseRssItems(xmlText) {
+        const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+        if (doc.querySelector('parsererror')) throw new Error('Invalid feed');
+
+        return Array.from(doc.querySelectorAll('item')).map((item) => {
+          const descEl = item.querySelector('description');
+          const rawDesc = descEl ? descEl.textContent : '';
+          const categoryEl = item.querySelector('category');
+          const excerpt = stripHtml(rawDesc);
+          return {
+            title: (item.querySelector('title') && item.querySelector('title').textContent) || '',
+            link: (item.querySelector('link') && item.querySelector('link').textContent) || '#',
+            author: (item.querySelector('dc\\:creator, creator') && item.querySelector('dc\\:creator, creator').textContent) || 'Hamro Niti',
+            pubDate: (item.querySelector('pubDate') && item.querySelector('pubDate').textContent) || '',
+            category: categoryEl ? categoryEl.textContent : 'Article',
+            excerpt,
+            image: extractImage(rawDesc),
+            dateLabel: formatDate((item.querySelector('pubDate') && item.querySelector('pubDate').textContent) || ''),
+            readTime: estimateReadTime(excerpt),
+          };
+        });
+      }
+
+      function shuffle(array) {
+        const copy = array.slice();
+        for (let i = copy.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+      }
+
+      async function loadRandomFullArticle() {
+        try {
+          const res = await fetch(feedUrl);
+          if (!res.ok) throw new Error('Feed unavailable');
+          const posts = parseRssItems(await res.text());
+          if (posts.length === 0) throw new Error('No articles');
+          const article = shuffle(posts)[0];
+
+          try {
+            await loadFullArticleInIframe(article);
+          } catch (iframeErr) {
+            mountFallbackArticle(article);
+          }
+        } catch (err) {
+          showError('Could not load article. Please try again.');
+        }
+      }
+
+      async function resolveShortLink() {
+        try {
+          const res = await fetch(`${apiBase}/api/resolve/${encodeURIComponent(shortCode)}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'Shortened URL not found');
+          destinationUrl = data.originalUrl;
+        } catch (err) {
+          showError(err.message || 'Unable to resolve this link.');
+        }
+      }
     })();
   </script>
 </body>

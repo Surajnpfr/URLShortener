@@ -48,3 +48,6 @@ db/
 dump/
 *.db
 *.sqlite
+
+# Holding page
+holding-page/
