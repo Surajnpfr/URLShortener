@@ -1,30 +1,30 @@
-# Node dependency directories
+# Dependencies
 node_modules/
-jspm_packages/
 
-# Production build outputs
+# Production builds
 dist/
 build/
 out/
-.next/
+dist-ssr/
 
-# Environment files
+# Environment files (keep *.example templates in git)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.env
+.env.*
+!.env.example
+!**/.env.example
+!.env.*.example
+!**/.env.*.example
 
-# Log files
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-*.log
 
-# Editor and OS configurations
+# Editor and OS
 .vscode/
 .idea/
 *.suo
@@ -35,15 +35,16 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
-# System cache directories
+# Tooling / local cache
 .gemini/
 .antigravity/
 .system_generated/
+coverage/
+*.tsbuildinfo
 
-# Database dumps and local data storage
+# Local database / dumps
 data/
 db/
 dump/
 *.db
 *.sqlite
-

@@ -3,16 +3,9 @@ import confetti from 'canvas-confetti';
 import { Link2, Copy, Check, QrCode, AlertCircle, Download } from 'lucide-react';
 import { drawQrCanvas, getQrSvgString, downloadFile } from './qrCodeUtils.jsx';
 
-<<<<<<< HEAD
-export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl, domains = ['drovashop.com'], settings = { redirectType: 302, shortCodeLength: 6 } }) {
-  const [url, setUrl] = useState('');
-  const [customAlias, setCustomAlias] = useState('');
-  const [domain, setDomain] = useState(domains[0] || 'drovashop.com');
-=======
 export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }) {
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
->>>>>>> c49193b20b300406eb3aeea420f9305225b431b0
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);

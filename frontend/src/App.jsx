@@ -95,21 +95,8 @@ export default function App() {
   // Navigation active tab in sidebar
   const [activeTab, setActiveTab] = useState('dashboard');
 
-<<<<<<< HEAD
-  // Dynamic Custom Domains List state
-  const [domains, setDomains] = useState(() => {
-    const local = localStorage.getItem('domains');
-    if (local) {
-      const parsed = JSON.parse(local);
-      if (parsed.includes('drovashop.com')) return parsed;
-      return ['drovashop.com', ...parsed.filter(d => d !== 'linkly.to')];
-    }
-    return ['drovashop.com'];
-  });
-=======
   // Client-side router path state
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
->>>>>>> c49193b20b300406eb3aeea420f9305225b431b0
 
   // Synchronize route with history back/forward button navigations
   useEffect(() => {

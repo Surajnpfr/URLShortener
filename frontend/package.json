@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "start": "serve -s dist -l tcp://0.0.0.0:${PORT:-4173}",
     "lint": "eslint .",
     "preview": "vite preview"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
     "lucide-react": "^1.21.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "serve": "^14.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
