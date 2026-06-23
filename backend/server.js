@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const { connectDB, getDbMode } = require('./config/db');
+const { createSessionMiddleware } = require('./config/session');
 const {
   buildShortUrl,
   getAllowedDashboardOrigins,
@@ -10,8 +12,13 @@ const {
   getShortLinkBaseUrl,
 } = require('./config/env');
 const Url = require('./models/Url');
+const { recordClick } = require('./services/clickTracking');
+const authRoutes = require('./routes/auth');
+const urlsRoutes = require('./routes/urls');
+const analyticsRoutes = require('./routes/analytics');
+const { requireAuth } = require('./middleware/auth');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
@@ -38,20 +45,19 @@ app.use((req, res, next) => {
 
       callback(new Error('Not allowed by CORS'));
     },
+    credentials: true,
   })(req, res, next);
 });
 
+const sessionMiddleware = createSessionMiddleware();
+if (sessionMiddleware) {
+  app.use(sessionMiddleware);
+} else {
+  console.warn('API auth routes require SECRET in backend/.env');
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-function generateShortCode(length = 6) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
 
 function renderNotFoundPage(baseUrl) {
   return `
@@ -87,8 +93,7 @@ async function handleShortCodeRedirect(req, res, shortCode) {
     return res.status(404).send(renderNotFoundPage(baseUrl));
   }
 
-  urlDoc.clicks = (urlDoc.clicks || 0) + 1;
-  await urlDoc.save();
+  await recordClick(urlDoc, req);
 
   const holdingUrl = getHoldingPageUrl(shortCode);
   if (holdingUrl) {
@@ -127,105 +132,10 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-app.get('/api/urls', async (req, res) => {
-  try {
-    const urls = await Url.find().sort({ createdAt: -1 });
-    const baseUrl = getShortLinkBaseUrl(req);
-
-    const formattedUrls = urls.map((item) => ({
-      _id: item._id,
-      originalUrl: item.originalUrl,
-      shortCode: item.shortCode,
-      shortUrl: buildShortUrl(baseUrl, item.shortCode),
-      clicks: item.clicks,
-      createdAt: item.createdAt,
-    }));
-
-    res.json(formattedUrls);
-  } catch (error) {
-    console.error('Error fetching URLs:', error);
-    res.status(500).json({ error: 'Server error fetching URLs' });
-  }
-});
-
-app.post('/api/shorten', async (req, res) => {
-  const { url, customAlias, redirectType, shortCodeLength } = req.body;
-
-  if (!url) {
-    return res.status(400).json({ error: 'Original URL is required' });
-  }
-
-  let targetUrl = url.trim();
-  if (!/^https?:\/\//i.test(targetUrl)) {
-    targetUrl = `https://${targetUrl}`;
-  }
-
-  try {
-    new URL(targetUrl);
-  } catch (err) {
-    return res.status(400).json({ error: 'Invalid URL format' });
-  }
-
-  try {
-    let shortCode;
-    const parsedRedirectType = redirectType ? parseInt(redirectType, 10) : 302;
-    const parsedLength = shortCodeLength ? parseInt(shortCodeLength, 10) : 6;
-
-    if (customAlias) {
-      const alias = customAlias.trim();
-      const aliasRegex = /^[a-zA-Z0-9-_]{3,30}$/;
-      if (!aliasRegex.test(alias)) {
-        return res.status(400).json({
-          error: 'Custom alias must be between 3 and 30 characters and only contain letters, numbers, hyphens, and underscores.',
-        });
-      }
-
-      const existing = await Url.findOne({ shortCode: alias });
-      if (existing) {
-        return res.status(400).json({ error: 'Custom alias is already taken. Please choose another one.' });
-      }
-
-      shortCode = alias;
-    } else {
-      let isUnique = false;
-      let attempts = 0;
-
-      while (!isUnique && attempts < 10) {
-        shortCode = generateShortCode(parsedLength);
-        const existing = await Url.findOne({ shortCode });
-        if (!existing) {
-          isUnique = true;
-        }
-        attempts++;
-      }
-
-      if (!isUnique) {
-        return res.status(500).json({ error: 'Failed to generate a unique short code. Please try again.' });
-      }
-    }
-
-    const newUrl = await Url.create({
-      originalUrl: targetUrl,
-      shortCode,
-      redirectType: parsedRedirectType,
-    });
-
-    const baseUrl = getShortLinkBaseUrl(req);
-
-    res.status(201).json({
-      _id: newUrl._id,
-      originalUrl: newUrl.originalUrl,
-      shortCode: newUrl.shortCode,
-      shortUrl: buildShortUrl(baseUrl, newUrl.shortCode),
-      clicks: newUrl.clicks,
-      createdAt: newUrl.createdAt,
-      redirectType: newUrl.redirectType,
-    });
-  } catch (error) {
-    console.error('Error shortening URL:', error);
-    res.status(500).json({ error: 'Server error while shortening URL' });
-  }
-});
+app.use('/api/auth', authRoutes);
+app.use('/api/urls', urlsRoutes);
+app.post('/api/shorten', requireAuth, urlsRoutes.handleShorten);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/api/resolve/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   const { shortCode } = req.params;
@@ -246,36 +156,33 @@ app.get('/api/resolve/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   }
 });
 
-app.delete('/api/urls/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const deleted = await Url.findByIdAndDelete(id);
-    if (!deleted) {
-      return res.status(404).json({ error: 'Shortened URL not found' });
-    }
-    res.json({ message: 'Shortened URL deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting URL:', error);
-    res.status(500).json({ error: 'Server error while deleting URL' });
-  }
-});
+const RESERVED_SHORT_CODES = new Set([
+  'login', 'logout', 'signup', 'register', 'callback', 'health', 'favicon', 'api',
+]);
 
-app.get('/go/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
+async function handleRootShortCodeRedirect(req, res, shortCode) {
+  if (RESERVED_SHORT_CODES.has(shortCode)) {
+    return res.status(404).json({
+      status: 404,
+      error: 'Not Found',
+      message: `Cannot GET /${shortCode}`,
+    });
+  }
+
   try {
-    await handleShortCodeRedirect(req, res, req.params.shortCode);
+    await handleShortCodeRedirect(req, res, shortCode);
   } catch (error) {
     console.error('Redirection error:', error);
     res.status(500).send('Server redirection error');
   }
+}
+
+app.get('/go/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
+  await handleRootShortCodeRedirect(req, res, req.params.shortCode);
 });
 
 app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
-  try {
-    await handleShortCodeRedirect(req, res, req.params.shortCode);
-  } catch (error) {
-    console.error('Redirection error:', error);
-    res.status(500).send('Server redirection error');
-  }
+  await handleRootShortCodeRedirect(req, res, req.params.shortCode);
 });
 
 app.use((req, res) => {
@@ -287,7 +194,7 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('🔥 Uncaught Global Exception:', err.stack || err);
+  console.error('Uncaught Global Exception:', err.stack || err);
   res.status(500).json({
     status: 500,
     error: 'Internal Server Error',
@@ -300,7 +207,7 @@ async function startServer() {
 
   const port = process.env.PORT || 3000;
   app.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 Production server running on port ${port} (bound to 0.0.0.0)`);
+    console.log(`Production server running on port ${port} (bound to 0.0.0.0)`);
   });
 }
 

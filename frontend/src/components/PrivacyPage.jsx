@@ -4,12 +4,10 @@ import {
 } from 'lucide-react';
 import { Card, Divider, Space, Typography, Row, Col } from './antd';
 
-export default function PrivacyPage({ setCurrentPath }) {
-  // Helper to scroll to top and set path back to home page
+export default function PrivacyPage({ onNavigate }) {
   const handleGoHome = (e) => {
     e.preventDefault();
-    window.history.pushState({}, '', '/');
-    setCurrentPath('/');
+    onNavigate('/');
     window.scrollTo(0, 0);
   };
 

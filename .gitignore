@@ -7,9 +7,15 @@ build/
 out/
 dist-ssr/
 
-# Environment files (keep *.example templates in git)
+# Environment — never commit secrets (templates *.example are allowed)
 .env
 .env.*
+.env.local
+.env.*.local
+**/.env
+**/.env.*
+**/.env.local
+**/.env.*.local
 !.env.example
 !**/.env.example
 !.env.*.example
@@ -24,9 +30,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Editor and OS
+# Editor, IDE, and local tooling
 .vscode/
 .idea/
+.cursor/
 *.suo
 *.ntvs*
 *.njsproj
@@ -35,12 +42,14 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
-# Tooling / local cache
+# Test / cache
+coverage/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
 .gemini/
 .antigravity/
 .system_generated/
-coverage/
-*.tsbuildinfo
 
 # Local database / dumps
 data/
@@ -49,5 +58,5 @@ dump/
 *.db
 *.sqlite
 
-# Holding page
-holding-page/
+# Archives / accidental uploads
+*.zip

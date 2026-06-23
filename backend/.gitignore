@@ -1,5 +1,2 @@
+# Inherits rules from root .gitignore — local overrides only
 node_modules/
-.env
-.env.*
-!.env.example
-.holding-page/

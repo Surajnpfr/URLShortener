@@ -11,6 +11,12 @@ const UrlSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  },
   clicks: {
     type: Number,
     required: true,
@@ -26,15 +32,27 @@ const UrlSchema = new mongoose.Schema({
   },
 });
 
+UrlSchema.index({ user: 1, createdAt: -1 });
+
 const MongooseUrlModel = mongoose.model('Url', UrlSchema);
 
 const mockDb = [];
+
+function matchesQuery(item, query = {}) {
+  return Object.entries(query).every(([key, value]) => {
+    if (value && typeof value === 'object' && value.$ne !== undefined) {
+      return String(item[key]) !== String(value.$ne);
+    }
+    return String(item[key]) === String(value);
+  });
+}
 
 class MockUrlDocument {
   constructor(data) {
     this._id = data._id || Math.random().toString(36).substring(2, 9);
     this.originalUrl = data.originalUrl;
     this.shortCode = data.shortCode;
+    this.user = data.user;
     this.clicks = data.clicks || 0;
     this.createdAt = data.createdAt || new Date();
     this.redirectType = data.redirectType || 302;
@@ -43,36 +61,36 @@ class MockUrlDocument {
   async save() {
     const idx = mockDb.findIndex((item) => item._id === this._id);
     if (idx !== -1) {
-      mockDb[idx] = this;
+      mockDb[idx] = { ...this };
     } else {
-      mockDb.push(this);
+      mockDb.push({ ...this });
     }
     return this;
   }
 }
 
 const MockUrlModel = {
-  find: () => ({
-    sort: () => {
-      const sorted = [...mockDb]
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  find: (query = {}) => ({
+    sort: (sortSpec) => {
+      const filtered = mockDb
+        .filter((item) => matchesQuery(item, query))
+        .sort((a, b) => {
+          if (sortSpec?.createdAt === -1) {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          }
+          return 0;
+        })
         .map((item) => new MockUrlDocument(item));
-      return Promise.resolve(sorted);
-    },
-    then: (resolve) => {
-      const mapped = mockDb.map((item) => new MockUrlDocument(item));
-      return Promise.resolve(mapped).then(resolve);
+      return Promise.resolve(filtered);
     },
   }),
 
   findOne: async (query) => {
-    const found = mockDb.find((item) => {
-      if (query.shortCode && item.shortCode === query.shortCode) return true;
-      if (query._id && item._id === query._id) return true;
-      return false;
-    });
+    const found = mockDb.find((item) => matchesQuery(item, query));
     return found ? new MockUrlDocument(found) : null;
   },
+
+  findById: async (id) => MockUrlModel.findOne({ _id: id }),
 
   create: async (data) => {
     const doc = new MockUrlDocument(data);
@@ -89,18 +107,25 @@ const MockUrlModel = {
     }
     return null;
   },
+
+  countDocuments: async (query = {}) => mockDb.filter((item) => matchesQuery(item, query)).length,
 };
 
 const Url = {
   find: (...args) => (
     getDbMode() === 'MOCK'
-      ? MockUrlModel.find()
+      ? MockUrlModel.find(...args)
       : MongooseUrlModel.find(...args)
   ),
   findOne: (...args) => (
     getDbMode() === 'MOCK'
       ? MockUrlModel.findOne(...args)
       : MongooseUrlModel.findOne(...args)
+  ),
+  findById: (...args) => (
+    getDbMode() === 'MOCK'
+      ? MockUrlModel.findById(...args)
+      : MongooseUrlModel.findById(...args)
   ),
   create: (...args) => (
     getDbMode() === 'MOCK'
@@ -111,6 +136,11 @@ const Url = {
     getDbMode() === 'MOCK'
       ? MockUrlModel.findByIdAndDelete(...args)
       : MongooseUrlModel.findByIdAndDelete(...args)
+  ),
+  countDocuments: (...args) => (
+    getDbMode() === 'MOCK'
+      ? MockUrlModel.countDocuments(...args)
+      : MongooseUrlModel.countDocuments(...args)
   ),
 };
 

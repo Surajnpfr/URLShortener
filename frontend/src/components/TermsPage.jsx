@@ -13,12 +13,10 @@ import {
 } from 'lucide-react';
 import { Card, Divider, Typography } from './antd';
 
-export default function TermsPage({ setCurrentPath }) {
-  // Helper to scroll to top and set path back to home page
+export default function TermsPage({ onNavigate }) {
   const handleGoHome = (e) => {
     e.preventDefault();
-    window.history.pushState({}, '', '/');
-    setCurrentPath('/');
+    onNavigate('/');
     window.scrollTo(0, 0);
   };
 

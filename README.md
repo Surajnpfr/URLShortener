@@ -85,14 +85,40 @@ Redirect to Original URL
 
 GET /:shortCode
 
+## Authentication (email + password)
+
+Session-based auth with `express-session` and `bcryptjs`. No third-party OAuth required.
+
+1. Copy `backend/.env.example` → `backend/.env`
+2. Set `SECRET` — generate with: `openssl rand -hex 32`
+3. Set `DATABASE_URL`, `BASE_URL`, `FRONTEND_URL`, and CORS origins (see `backend/.env.example`)
+4. For production frontend builds, copy `frontend/.env.production.example` → `frontend/.env.production` and set `VITE_API_URL`
+
+### Auth API routes
+
+- `POST /api/auth/register` — create account
+- `POST /api/auth/login` — sign in (sets session cookie)
+- `POST /api/auth/logout` — sign out
+- `GET /api/auth/me` — current user profile
+- `PATCH /api/auth/me` — update display name
+
+### Protected API routes (session cookie)
+
+- `GET /api/urls`, `POST /api/shorten`, `DELETE /api/urls/:id`
+- `GET /api/analytics/summary`, `GET /api/analytics/links/:urlId`
+
+Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`
+
+Frontend login UI: `/login` and `/register`
+
 🎯 Roadmap
 
-- [ ] URL shortening service
-- [ ] Custom aliases
-- [ ] QR code generation
-- [ ] Click analytics
-- [ ] User authentication
-- [ ] Dashboard for link management
+- [x] URL shortening service
+- [x] Custom aliases
+- [x] QR code generation
+- [x] Click analytics
+- [x] User authentication (email / password sessions)
+- [x] Dashboard for link management
 - [ ] Link expiration support
 - [ ] Rate limiting and abuse protection
 

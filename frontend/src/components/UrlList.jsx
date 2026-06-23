@@ -1,14 +1,66 @@
 import { useEffect, useState } from 'react';
-import { Card, Empty, Typography } from './antd.jsx';
+import { Typography } from './antd.jsx';
 import { copyToClipboard, downloadFile, drawQrCanvas, getQrSvgString, getShortDisplay } from './qrCodeUtils.jsx';
 import { 
   Copy, Check, QrCode, Trash2, BarChart2, 
-  Link2, Users, Target, Search,
+  Search,
   MoreVertical
 } from 'lucide-react';
 import AccountSettingsPage from './AccountSettingsPage';
+import { pathForTab } from '../router';
+import { fetchAnalyticsSummary, fetchLinkAnalytics } from '../lib/urlApi';
 
 const truncateUrl = (value, maxLength = 54) => getShortDisplay(value, maxLength);
+
+const Metric = ({ label, value }) => (
+  <div className="metric-item">
+    <span className="metric-label">{label}</span>
+    <span className="metric-value">{value}</span>
+  </div>
+);
+
+function buildSparklinePath(clicksByDay = []) {
+  if (!clicksByDay.length) {
+    return 'M 0 8 L 48 8';
+  }
+
+  const values = clicksByDay.map((day) => day.clicks || 0);
+  const max = Math.max(...values, 1);
+
+  return values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * 48;
+      const y = 16 - (value / max) * 14 - 1;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ');
+}
+
+const AnalyticsChart = ({ clicksByDay }) => {
+  if (!clicksByDay?.length) {
+    return (
+      <div className="empty-state empty-state--inline">
+        <p>No click activity in this period yet.</p>
+      </div>
+    );
+  }
+
+  const maxClicks = Math.max(...clicksByDay.map((day) => day.clicks || 0), 1);
+
+  return (
+    <div className="analytics-chart">
+      {clicksByDay.map((day) => (
+        <div key={day.date} className="analytics-chart-bar-wrap" title={`${day.date}: ${day.clicks} clicks`}>
+          <div
+            className="analytics-chart-bar"
+            style={{ height: `${Math.max(((day.clicks || 0) / maxClicks) * 100, 4)}%` }}
+          />
+          <span className="analytics-chart-label">{day.date.slice(5)}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const QrGalleryCard = ({ item, onCopy, onOpenQr }) => {
   const [svgMarkup, setSvgMarkup] = useState('');
@@ -42,40 +94,41 @@ const QrGalleryCard = ({ item, onCopy, onOpenQr }) => {
   };
 
   return (
-    <Card className="qr-gallery-card" bordered>
+    <div className="qr-gallery-item">
       <div className="qr-gallery-preview">
-        {svgMarkup ? <div dangerouslySetInnerHTML={{ __html: svgMarkup }} /> : <div className="qr-gallery-loading">Loading QR...</div>}
+        {svgMarkup ? <div dangerouslySetInnerHTML={{ __html: svgMarkup }} /> : <div className="qr-gallery-loading">Loading…</div>}
       </div>
       <div className="qr-gallery-copy">
         <Typography.Text strong>{item.shortUrl}</Typography.Text>
         <Typography.Text type="secondary">{truncateUrl(item.originalUrl)}</Typography.Text>
-        <Typography.Text type="secondary">Created {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Typography.Text>
       </div>
       <div className="qr-gallery-actions">
-        <button type="button" className="qr-gallery-action" onClick={() => onCopy(item._id, item.shortUrl)}>
-          <Copy size={14} /> Copy Link
+        <button type="button" className="btn-ghost-sm" onClick={() => onCopy(item._id, item.shortUrl)}>
+          <Copy size={14} /> Copy
         </button>
-        <button type="button" className="qr-gallery-action" onClick={handleDownloadPng}>
-          Download PNG
-        </button>
-        <button type="button" className="qr-gallery-action" onClick={handleDownloadSvg}>
-          Download SVG
-        </button>
-        <button type="button" className="qr-gallery-action primary" onClick={() => onOpenQr(item.shortUrl, item.shortCode)}>
-          <QrCode size={14} /> Open QR
+        <button type="button" className="btn-ghost-sm" onClick={handleDownloadPng}>PNG</button>
+        <button type="button" className="btn-ghost-sm" onClick={handleDownloadSvg}>SVG</button>
+        <button type="button" className="btn-ghost-sm btn-ghost-sm--primary" onClick={() => onOpenQr(item.shortUrl, item.shortCode)}>
+          <QrCode size={14} /> Open
         </button>
       </div>
-    </Card>
+    </div>
   );
 };
 
 export default function UrlList({
-  urls, activeTab, onDelete, onViewQr, onOpenAnalytics,
+  urls, activeTab, onDelete, onViewQr, onOpenAnalytics, onNavigate, onLogout,
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [qrSearchQuery, setQrSearchQuery] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null);
+  const [analyticsSummary, setAnalyticsSummary] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [linkSparklines, setLinkSparklines] = useState({});
+  const [selectedLinkId, setSelectedLinkId] = useState(null);
+  const [selectedLinkAnalytics, setSelectedLinkAnalytics] = useState(null);
+  const [analyticsRange, setAnalyticsRange] = useState('7d');
 
   const handleCopy = async (id, shortUrl) => {
     try {
@@ -103,23 +156,109 @@ export default function UrlList({
     return num;
   };
 
-  // Calculate dynamic stats
-  const totalLinks = urls.length;
-  const totalClicks = urls.reduce((sum, item) => sum + (item.clicks || 0), 0);
-  const uniqueClicks = Math.round(totalClicks * 0.72);
-  const avgCtr = totalLinks > 0 ? '62.3%' : '0%';
+  useEffect(() => {
+    if (activeTab !== 'dashboard' && activeTab !== 'analytics') {
+      return undefined;
+    }
 
-  // SVG Sparkline paths generator
-  const getSparklinePath = (clicks) => {
-    const seed = (clicks % 5) + 1;
-    if (seed === 1) return "M 0 12 Q 12 2, 24 10 T 48 4";
-    if (seed === 2) return "M 0 6 Q 12 14, 24 4 T 48 10";
-    if (seed === 3) return "M 0 10 Q 12 4, 24 12 T 48 2";
-    if (seed === 4) return "M 0 4 Q 12 10, 24 2 T 48 8";
-    return "M 0 8 Q 12 12, 24 4 T 48 6";
+    let cancelled = false;
+
+    const loadSummary = async () => {
+      setAnalyticsLoading(true);
+      try {
+        const summary = await fetchAnalyticsSummary(analyticsRange);
+        if (!cancelled) setAnalyticsSummary(summary);
+      } catch (error) {
+        console.error('Failed to load analytics summary:', error);
+        if (!cancelled) setAnalyticsSummary(null);
+      } finally {
+        if (!cancelled) setAnalyticsLoading(false);
+      }
+    };
+
+    void loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, analyticsRange, urls.length]);
+
+  useEffect(() => {
+    if (activeTab !== 'dashboard' || urls.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const recent = urls.slice(0, 5);
+
+    const loadSparklines = async () => {
+      const entries = await Promise.all(
+        recent.map(async (item) => {
+          try {
+            const data = await fetchLinkAnalytics(item._id, '7d');
+            return [item._id, data.clicksByDay || []];
+          } catch {
+            return [item._id, []];
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        setLinkSparklines(Object.fromEntries(entries));
+      }
+    };
+
+    void loadSparklines();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, urls]);
+
+  const openLinkAnalytics = async (urlId) => {
+    setSelectedLinkId(urlId);
+    try {
+      const data = await fetchLinkAnalytics(urlId, '30d');
+      setSelectedLinkAnalytics(data);
+      onOpenAnalytics?.();
+      onNavigate?.(pathForTab('analytics'));
+    } catch (error) {
+      console.error('Failed to load link analytics:', error);
+      alert(error.message || 'Unable to load link analytics.');
+    }
   };
 
-  // Filter links based on search
+  useEffect(() => {
+    if (activeTab !== 'analytics' || !selectedLinkId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadSelected = async () => {
+      try {
+        const data = await fetchLinkAnalytics(selectedLinkId, analyticsRange);
+        if (!cancelled) setSelectedLinkAnalytics(data);
+      } catch (error) {
+        console.error('Failed to load selected link analytics:', error);
+      }
+    };
+
+    void loadSelected();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, selectedLinkId, analyticsRange]);
+
+  const totalLinks = analyticsSummary?.linkCount ?? urls.length;
+  const totalClicks = analyticsSummary?.totalClicks ?? urls.reduce((sum, item) => sum + (item.clicks || 0), 0);
+  const uniqueVisitors = analyticsSummary?.uniqueVisitors ?? 0;
+  const avgClicksPerLink = totalLinks > 0 ? (totalClicks / totalLinks).toFixed(1) : '0';
+  const topLink = analyticsSummary?.topLinks?.[0] || (urls.length > 0
+    ? [...urls].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0]
+    : null);
+
   const filteredUrls = urls.filter(url => 
     url.originalUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
     url.shortCode.toLowerCase().includes(searchQuery.toLowerCase())
@@ -130,79 +269,49 @@ export default function UrlList({
     return url.originalUrl.toLowerCase().includes(query) || url.shortUrl.toLowerCase().includes(query);
   });
 
-  // 1. Dashboard View
+  const rangeControls = (
+    <div className="analytics-range-controls">
+      {['7d', '30d', '90d', 'all'].map((range) => (
+        <button
+          key={range}
+          type="button"
+          className={`analytics-range-btn${analyticsRange === range ? ' is-active' : ''}`}
+          onClick={() => setAnalyticsRange(range)}
+        >
+          {range === 'all' ? 'All' : range.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+
   if (activeTab === 'dashboard') {
     return (
-      <>
-        {/* Stats Row */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-title">Total Links</span>
-              <span className="stat-value">{totalLinks}</span>
-              <span className="stat-trend">
-                <span className="stat-trend-val">+{totalLinks > 0 ? 12 : 0}</span> this month
-              </span>
-            </div>
-            <div className="stat-icon-wrapper" style={{ background: '#eff6ff', color: '#355bf5' }}>
-              <Link2 size={18} />
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-title">Total Clicks</span>
-              <span className="stat-value">{formatNumber(totalClicks)}</span>
-              <span className="stat-trend">
-                <span className="stat-trend-val">+{totalClicks > 0 ? '18%' : '0%'}</span> this month
-              </span>
-            </div>
-            <div className="stat-icon-wrapper" style={{ background: '#e0f2fe', color: '#0284c7' }}>
-              <BarChart2 size={18} />
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-title">Unique Clicks</span>
-              <span className="stat-value">{formatNumber(uniqueClicks)}</span>
-              <span className="stat-trend">
-                <span className="stat-trend-val">+{totalClicks > 0 ? '16%' : '0%'}</span> this month
-              </span>
-            </div>
-            <div className="stat-icon-wrapper" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
-              <Users size={18} />
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-title">Avg. CTR</span>
-              <span className="stat-value">{avgCtr}</span>
-              <span className="stat-trend">
-                <span className="stat-trend-val">+{totalLinks > 0 ? '8%' : '0%'}</span> this month
-              </span>
-            </div>
-            <div className="stat-icon-wrapper" style={{ background: '#fdf2f8', color: '#db2777' }}>
-              <Target size={18} />
-            </div>
-          </div>
+      <div className="dashboard-panel-body">
+        <div className="metrics-bar">
+          <Metric label="Links" value={totalLinks} />
+          <Metric label="Clicks" value={formatNumber(totalClicks)} />
+          <Metric label="Unique" value={formatNumber(uniqueVisitors)} />
+          <Metric label="Avg. clicks/link" value={avgClicksPerLink} />
         </div>
 
-        {/* Recent Links Table */}
-        <div>
-          <div className="recent-links-header">
-            <h3>Recent Links</h3>
-            <button className="btn-viewall">View all</button>
+        <section className="panel-block">
+          <div className="panel-block-header">
+            <h3>Recent links</h3>
+            <button
+              type="button"
+              className="btn-text"
+              onClick={() => onNavigate?.(pathForTab('links'))}
+            >
+              View all
+            </button>
           </div>
 
           {filteredUrls.length === 0 ? (
-            <div className="empty-state" style={{ background: 'transparent', border: '1px dashed var(--card-border)', borderRadius: '12px', marginTop: '16px' }}>
-              <Link2 size={40} style={{ opacity: 0.4 }} />
-              <p>No shortened links found. Create your first link above!</p>
+            <div className="empty-state empty-state--inline">
+              <p>No links yet. Paste a URL above to create your first short link.</p>
             </div>
           ) : (
-            <div className="list-container" style={{ marginTop: '16px' }}>
+            <div className="table-wrap">
               <table className="urls-table">
                 <thead>
                   <tr>
@@ -246,9 +355,11 @@ export default function UrlList({
                             {formatNumber(item.clicks || 0)}
                           </span>
                           <svg className="sparkline-svg" width="48" height="16" viewBox="0 0 48 16">
-                            <path 
-                              d={getSparklinePath(item.clicks || 0)} 
-                              stroke={item.clicks > 0 ? 'var(--primary)' : 'var(--text-muted)'} 
+                            <path
+                              d={buildSparklinePath(linkSparklines[item._id])}
+                              stroke={(item.clicks || 0) > 0 ? 'var(--primary)' : 'var(--text-muted)'}
+                              fill="none"
+                              strokeWidth="1.5"
                             />
                           </svg>
                         </div>
@@ -266,7 +377,7 @@ export default function UrlList({
                             {copiedId === item._id ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Copy size={14} />}
                           </button>
                           <button
-                            onClick={() => onOpenAnalytics?.()}
+                            onClick={() => void openLinkAnalytics(item._id)}
                             className="link-row-action"
                             title="Analytics"
                           >
@@ -310,18 +421,17 @@ export default function UrlList({
               </table>
             </div>
           )}
-        </div>
-      </>
+        </section>
+      </div>
     );
   }
 
-  // 2. Links Tab
   if (activeTab === 'links') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <h3>All shortened links ({filteredUrls.length})</h3>
-          <div className="input-wrapper" style={{ maxWidth: '300px' }}>
+      <div className="dashboard-panel-body">
+        <div className="panel-toolbar panel-toolbar--compact">
+          <span className="panel-toolbar-meta">{filteredUrls.length} link{filteredUrls.length === 1 ? '' : 's'}</span>
+          <div className="input-wrapper panel-search">
             <Search size={16} className="input-icon" />
             <input
               type="text"
@@ -329,18 +439,17 @@ export default function UrlList({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="form-input"
-              style={{ padding: '10px 10px 10px 40px', borderRadius: '8px', fontSize: '0.875rem' }}
+              style={{ padding: '10px 10px 10px 40px', borderRadius: '12px', fontSize: '0.875rem' }}
             />
           </div>
         </div>
 
         {filteredUrls.length === 0 ? (
-          <div className="empty-state">
-            <Search size={40} />
-            <p>No matching links found.</p>
+          <div className="empty-state empty-state--inline">
+            <p>{urls.length === 0 ? 'No links yet.' : 'No results for that search.'}</p>
           </div>
         ) : (
-          <div className="list-container">
+          <div className="table-wrap">
             <table className="urls-table">
               <thead>
                 <tr>
@@ -406,6 +515,16 @@ export default function UrlList({
                             </button>
                             <button
                               onClick={() => {
+                                void openLinkAnalytics(item._id);
+                                setActiveMenuId(null);
+                              }}
+                              className="dropdown-item"
+                            >
+                              <BarChart2 size={13} />
+                              Analytics
+                            </button>
+                            <button
+                              onClick={() => {
                                 onViewQr(item.shortUrl, item.shortCode);
                                 setActiveMenuId(null);
                               }}
@@ -438,44 +557,113 @@ export default function UrlList({
     );
   }
 
-  // 3. Analytics Tab
   if (activeTab === 'analytics') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <h3>Link Click Analytics</h3>
-        <div style={{ border: '1px solid var(--card-border)', borderRadius: '12px', padding: '40px', textAlign: 'center', background: 'var(--card-bg)' }}>
-          <BarChart2 size={48} style={{ color: 'var(--primary)', marginBottom: '16px', opacity: 0.7 }} />
-          <h4>Clicks Overview</h4>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '400px', margin: '8px auto 24px' }}>
-            We've logged <strong>{totalClicks}</strong> total visits across <strong>{totalLinks}</strong> custom URLs.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '500px', margin: '0 auto' }}>
-            <div style={{ padding: '16px', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Top Shortcode</span>
-              <h4 style={{ fontSize: '1.25rem', marginTop: '4px' }}>{urls.length > 0 ? urls[0].shortCode : 'None'}</h4>
-            </div>
-            <div style={{ padding: '16px', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Top Destination</span>
-              <h4 style={{ fontSize: '1.25rem', marginTop: '4px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {urls.length > 0 ? urls[0].originalUrl.split('/')[2] : 'None'}
-              </h4>
-            </div>
-          </div>
+      <div className="dashboard-panel-body">
+        <div className="panel-toolbar panel-toolbar--compact">
+          <span className="panel-toolbar-meta">Performance overview</span>
+          {rangeControls}
         </div>
+
+        <div className="metrics-bar">
+          <Metric label="Total clicks" value={formatNumber(totalClicks)} />
+          <Metric label="Unique visitors" value={formatNumber(uniqueVisitors)} />
+          <Metric label="Links" value={totalLinks} />
+          <Metric label="Top shortcode" value={topLink?.shortCode || '—'} />
+        </div>
+
+        {analyticsLoading ? (
+          <div className="settings-loading-state">Loading analytics…</div>
+        ) : (
+          <>
+            <section className="panel-block">
+              <div className="panel-block-header">
+                <h3>Clicks over time</h3>
+              </div>
+              <AnalyticsChart clicksByDay={analyticsSummary?.clicksByDay || []} />
+            </section>
+
+            {analyticsSummary?.topLinks?.length > 0 && (
+              <section className="panel-block">
+                <div className="panel-block-header">
+                  <h3>Top links</h3>
+                </div>
+                <dl className="detail-list">
+                  {analyticsSummary.topLinks.map((link) => (
+                    <div className="detail-list-row" key={link.urlId || link.shortCode}>
+                      <dt>{link.shortCode}</dt>
+                      <dd>
+                        {formatNumber(link.clicks)} clicks · {formatNumber(link.unique)} unique
+                        <button
+                          type="button"
+                          className="btn-text"
+                          style={{ marginLeft: '12px' }}
+                          onClick={() => {
+                            setSelectedLinkId(link.urlId);
+                            setSelectedLinkAnalytics(null);
+                          }}
+                        >
+                          View details
+                        </button>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+
+            {selectedLinkAnalytics && (
+              <section className="panel-block">
+                <div className="panel-block-header">
+                  <h3>Link details: {selectedLinkAnalytics.shortCode}</h3>
+                </div>
+                <dl className="detail-list">
+                  <div className="detail-list-row">
+                    <dt>Destination</dt>
+                    <dd title={selectedLinkAnalytics.originalUrl}>{truncateUrl(selectedLinkAnalytics.originalUrl, 64)}</dd>
+                  </div>
+                  <div className="detail-list-row">
+                    <dt>Clicks</dt>
+                    <dd>{formatNumber(selectedLinkAnalytics.totalClicks)}</dd>
+                  </div>
+                  <div className="detail-list-row">
+                    <dt>Unique visitors</dt>
+                    <dd>{formatNumber(selectedLinkAnalytics.uniqueVisitors)}</dd>
+                  </div>
+                </dl>
+                <AnalyticsChart clicksByDay={selectedLinkAnalytics.clicksByDay || []} />
+                {selectedLinkAnalytics.topReferrers?.length > 0 && (
+                  <dl className="detail-list" style={{ marginTop: '16px' }}>
+                    <div className="detail-list-row">
+                      <dt>Top referrers</dt>
+                      <dd>
+                        {selectedLinkAnalytics.topReferrers.map((ref) => (
+                          <div key={ref.referrer}>{truncateUrl(ref.referrer, 48)} — {ref.clicks}</div>
+                        ))}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+              </section>
+            )}
+
+            {!topLink && !analyticsLoading && (
+              <div className="empty-state empty-state--inline">
+                <p>Analytics will appear once you have links with clicks.</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }
 
-  // 4. QR Codes Tab
   if (activeTab === 'qrcodes') {
     return (
-      <div className="qr-gallery-section">
-        <div className="qr-gallery-header">
-          <div>
-            <h3>QR Codes Gallery</h3>
-            <p>Search, preview, and download QR codes for every shortened link.</p>
-          </div>
-          <div className="input-wrapper qr-gallery-search">
+      <div className="dashboard-panel-body">
+        <div className="panel-toolbar panel-toolbar--compact">
+          <span className="panel-toolbar-meta">{qrFilteredUrls.length} QR code{qrFilteredUrls.length === 1 ? '' : 's'}</span>
+          <div className="input-wrapper panel-search qr-gallery-search">
             <Search size={16} className="input-icon" />
             <input
               type="text"
@@ -489,15 +677,11 @@ export default function UrlList({
         </div>
 
         {qrFilteredUrls.length === 0 ? (
-          <Empty
-            className="qr-empty-state"
-            image={<QrCode size={64} />}
-            description={urls.length === 0 ? 'Your QR codes will appear here.' : 'No QR codes match your search.'}
-          >
-            {urls.length === 0 ? 'Create your first shortened link to generate a QR code.' : null}
-          </Empty>
+          <div className="empty-state empty-state--inline">
+            <p>{urls.length === 0 ? 'QR codes are created when you shorten a link.' : 'No QR codes match your search.'}</p>
+          </div>
         ) : (
-          <div className="qr-gallery-grid">
+          <div className="qr-gallery-list">
             {qrFilteredUrls.map((item) => (
               <QrGalleryCard
                 key={item._id}
@@ -512,10 +696,12 @@ export default function UrlList({
     );
   }
 
-
-  // 6. Settings Tab
   if (activeTab === 'settings') {
-    return <AccountSettingsPage />;
+    return (
+      <div className="dashboard-panel-body dashboard-panel-body--settings">
+        <AccountSettingsPage onNavigate={onNavigate} onLogout={onLogout} />
+      </div>
+    );
   }
 
   return null;

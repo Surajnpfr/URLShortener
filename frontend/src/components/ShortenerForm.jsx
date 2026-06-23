@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Link2, Copy, Check, QrCode, AlertCircle, Download } from 'lucide-react';
 import { drawQrCanvas, getQrSvgString, downloadFile } from './qrCodeUtils.jsx';
+import { shortenUrl } from '../lib/urlApi';
 
-export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }) {
+export default function ShortenerForm({
+  onShortenSuccess,
+  onViewQr,
+  onLoginRequired,
+  variant = 'landing',
+  requiresAuth = false,
+  className = '',
+}) {
+  const isDashboard = variant === 'dashboard';
+  const inputRef = useRef(null);
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,6 +22,12 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }
   const [copied, setCopied] = useState(false);
   const [successQrSvg, setSuccessQrSvg] = useState('');
   const [successQrLoading, setSuccessQrLoading] = useState(false);
+
+  useEffect(() => {
+    if (isDashboard && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isDashboard]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,30 +40,21 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }
       return;
     }
 
+    if (requiresAuth) {
+      setError('Sign in to shorten your link.');
+      onLoginRequired?.();
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/shorten`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url.trim(),
-          customAlias: customAlias.trim() || undefined,
-        }),
+      const data = await shortenUrl({
+        url: url.trim(),
+        customAlias: customAlias.trim() || undefined,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Something went wrong. Please try again.');
-      }
-
-      // We override data.shortUrl base domain if user selected a custom domain in the select box!
-      // This is purely visual to match the dropdown selection: e.g. replacing 'localhost:5000' with selected domain.
       const formattedResult = { ...data };
-     
 
       setSuccessResult(formattedResult);
       setUrl('');
@@ -65,7 +72,7 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }
         particleCount: 80,
         spread: 50,
         origin: { y: 0.65 },
-        colors: ['#355bf5', '#6366f1', '#a855f7', '#10b981'],
+        colors: ['#2563eb', '#3b82f6', '#60a5fa', '#16a34a'],
       });
 
       if (onShortenSuccess) {
@@ -101,13 +108,19 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }
     downloadFile(successQrSvg, `qr-code-${successResult.shortCode}.svg`, 'image/svg+xml');
   };
 
+  const cardClassName = [
+    'shortener-card',
+    isDashboard ? 'shortener-card--dashboard' : '',
+    className,
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className="shortener-card">
-      <form onSubmit={handleSubmit}>
+    <div className={cardClassName}>
+      <form onSubmit={handleSubmit} noValidate>
         {error && (
-          <div className="error-banner" style={{ margin: '0 0 16px 0' }}>
+          <div className={`error-banner${isDashboard ? ' error-banner--compact' : ''}`} style={{ margin: '0 0 12px 0' }}>
             <AlertCircle size={18} />
-            <span style={{ fontSize: '0.9rem' }}>{error}</span>
+            <span>{error}</span>
           </div>
         )}
 
@@ -115,50 +128,54 @@ export default function ShortenerForm({ onShortenSuccess, onViewQr, apiBaseUrl }
           <div className="input-field-wrapper">
             <Link2 size={20} />
             <input
+              ref={inputRef}
               type="text"
-              placeholder="Paste your long URL here"
+              inputMode="url"
+              autoComplete="url"
+              placeholder="e.g. google.com"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={loading}
               className="shortener-input"
+              aria-label="URL to shorten"
             />
           </div>
 
           <button type="submit" disabled={loading} className="btn-shorten">
             {loading ? (
-              <div className="spinner"></div>
+              <div className="spinner" aria-hidden="true" />
             ) : (
-              <>
-                Shorten URL
-              </>
+              'Shorten URL'
             )}
           </button>
         </div>
 
-        {/* Dynamic extra settings for Custom Alias */}
-        <div className="extra-options-row">
+        <div className={`extra-options-row${isDashboard ? ' extra-options-row--dashboard' : ''}`}>
           <div className="custom-alias-input-wrapper">
-            <label htmlFor="alias-field">Custom Alias:</label>
+            <label htmlFor="alias-field">Custom alias</label>
             <input
               id="alias-field"
               type="text"
-              placeholder="e.g. sales2026"
+              placeholder="optional"
               value={customAlias}
               onChange={(e) => setCustomAlias(e.target.value)}
               className="custom-alias-field"
               disabled={loading}
+              spellCheck={false}
             />
           </div>
-          
-          <div className="terms-text">
-            <Check size={14} style={{ background: '#d1fae5', padding: '1px', borderRadius: '50%' }} />
-            <span>By creating a short link, you agree to our <strong>Terms of Service</strong> and <strong>Privacy Policy</strong>.</span>
-          </div>
+
+          {!isDashboard && (
+            <div className="terms-text">
+              <Check size={14} style={{ background: '#d1fae5', padding: '1px', borderRadius: '50%' }} />
+              <span>By creating a short link, you agree to our <strong>Terms of Service</strong> and <strong>Privacy Policy</strong>.</span>
+            </div>
+          )}
         </div>
       </form>
 
       {successResult && (
-        <div className="success-box feature-card-surface" style={{ marginTop: '16px' }}>
+        <div className={`success-box${isDashboard ? ' success-box--dashboard' : ' feature-card-surface'}`} style={{ marginTop: isDashboard ? '12px' : '16px' }}>
           <div className="success-header">
             <Check size={18} />
             <span>Link shortened successfully!</span>
