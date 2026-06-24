@@ -21,7 +21,7 @@ router.get('/me', async (req, res) => {
       user: formatUserResponse(req.user),
     });
   } catch (error) {
-    console.error('Failed to sync user (returning Auth0 profile):', error);
+    console.error('[auth/me] sync failed:', error.message);
     const oidcUser = req.oidc.user || {};
     return res.json({
       user: {
@@ -31,6 +31,10 @@ router.get('/me', async (req, res) => {
         plan: 'Free',
       },
       degraded: true,
+      syncError: {
+        message: error.message,
+        code: error.code || 'SYNC_ERROR',
+      },
     });
   }
 });

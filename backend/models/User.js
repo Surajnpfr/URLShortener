@@ -58,6 +58,12 @@ const MockUserModel = {
     return found ? new MockUserDocument(found) : null;
   },
 
+  findOneByEmail: async (email) => {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return null;
+    return MockUserModel.findOne({ email: normalized });
+  },
+
   findOneAndUpdate: async (query, update, options = {}) => {
     const idx = mockUsers.findIndex((item) => {
       if (query.auth0Id && item.auth0Id === query.auth0Id) return true;
@@ -82,6 +88,7 @@ const MockUserModel = {
     }
 
     const existing = mockUsers[idx];
+    if (setFields.auth0Id !== undefined) existing.auth0Id = setFields.auth0Id;
     if (setFields.email !== undefined) existing.email = normalizeEmail(setFields.email);
     if (setFields.name !== undefined) existing.name = setFields.name;
     if (setFields.plan !== undefined) existing.plan = setFields.plan;
@@ -94,11 +101,30 @@ const MockUserModel = {
   },
 };
 
+async function findOneByEmailMongoose(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+
+  let found = await MongooseUserModel.findOne({ email: normalized });
+  if (found) return found;
+
+  return MongooseUserModel.findOne({
+    email: {
+      $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+    },
+  });
+}
+
 const User = {
   findOne: (...args) => (
     getDbMode() === 'MOCK'
       ? MockUserModel.findOne(...args)
       : MongooseUserModel.findOne(...args)
+  ),
+  findOneByEmail: (email) => (
+    getDbMode() === 'MOCK'
+      ? MockUserModel.findOneByEmail(email)
+      : findOneByEmailMongoose(email)
   ),
   findOneAndUpdate: (...args) => (
     getDbMode() === 'MOCK'
