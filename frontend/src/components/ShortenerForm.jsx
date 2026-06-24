@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Link2, Copy, Check, QrCode, AlertCircle, Download } from 'lucide-react';
-import { drawQrCanvas, getQrSvgString, downloadFile } from './qrCodeUtils.jsx';
+import { Link2, Copy, Check, AlertCircle } from 'lucide-react';
 import { shortenUrl } from '../lib/urlApi';
+import ShareButton from './ShareButton';
 
 export default function ShortenerForm({
   onShortenSuccess,
-  onViewQr,
   onLoginRequired,
   variant = 'landing',
   requiresAuth = false,
@@ -20,8 +19,6 @@ export default function ShortenerForm({
   const [error, setError] = useState('');
   const [successResult, setSuccessResult] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [successQrSvg, setSuccessQrSvg] = useState('');
-  const [successQrLoading, setSuccessQrLoading] = useState(false);
 
   useEffect(() => {
     if (isDashboard && inputRef.current) {
@@ -54,20 +51,10 @@ export default function ShortenerForm({
         customAlias: customAlias.trim() || undefined,
       });
 
-      const formattedResult = { ...data };
-
-      setSuccessResult(formattedResult);
+      setSuccessResult({ ...data });
       setUrl('');
       setCustomAlias('');
-      setSuccessQrSvg('');
-      setSuccessQrLoading(true);
 
-      const svg = await getQrSvgString(formattedResult.shortUrl);
-      if (svg) {
-        setSuccessQrSvg(svg);
-      }
-      setSuccessQrLoading(false);
-      
       confetti({
         particleCount: 80,
         spread: 50,
@@ -75,9 +62,7 @@ export default function ShortenerForm({
         colors: ['#2563eb', '#3b82f6', '#60a5fa', '#16a34a'],
       });
 
-      if (onShortenSuccess) {
-        onShortenSuccess();
-      }
+      onShortenSuccess?.();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,18 +79,6 @@ export default function ShortenerForm({
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
-  };
-
-  const handleDownloadSuccessPng = async () => {
-    if (!successResult) return;
-    const canvas = document.createElement('canvas');
-    await drawQrCanvas(canvas, successResult.shortUrl);
-    downloadFile(canvas.toDataURL('image/png'), `qr-code-${successResult.shortCode}.png`, 'image/png');
-  };
-
-  const handleDownloadSuccessSvg = () => {
-    if (!successResult || !successQrSvg) return;
-    downloadFile(successQrSvg, `qr-code-${successResult.shortCode}.svg`, 'image/svg+xml');
   };
 
   const cardClassName = [
@@ -180,54 +153,29 @@ export default function ShortenerForm({
             <Check size={18} />
             <span>Link shortened successfully!</span>
           </div>
-          <div className="success-card-grid">
-            <div className="success-card-copy">
-              <a
-                href={successResult.shortUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="short-link"
-              >
-                {successResult.shortUrl}
-              </a>
-              <div className="original-link-preview">
-                Redirects to: {successResult.originalUrl}
-              </div>
-              <div className="result-actions">
-                <button 
-                  onClick={handleCopy} 
-                  className="btn btn-secondary" 
-                  title="Copy short link"
-                >
-                  {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button
-                  onClick={() => onViewQr(successResult.shortUrl, successResult.shortCode)}
-                  className="btn btn-secondary btn-icon"
-                  title="View QR Code"
-                >
-                  <QrCode size={16} />
-                </button>
-              </div>
-              <div className="success-download-row">
-                <button type="button" className="success-download-link" onClick={handleDownloadSuccessPng}>
-                  <Download size={14} /> Download QR
-                </button>
-                <button type="button" className="success-download-link" onClick={handleDownloadSuccessPng}>
-                  PNG
-                </button>
-                <button type="button" className="success-download-link" onClick={handleDownloadSuccessSvg}>
-                  SVG
-                </button>
-              </div>
+          <div className="success-card-copy">
+            <a
+              href={successResult.shortUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="short-link"
+            >
+              {successResult.shortUrl}
+            </a>
+            <div className="original-link-preview">
+              Redirects to: {successResult.originalUrl}
             </div>
-            <div className="success-qr-preview">
-              {successQrLoading ? (
-                <div className="success-qr-placeholder">Loading QR...</div>
-              ) : (
-                <div className="success-qr-svg" dangerouslySetInnerHTML={{ __html: successQrSvg }} />
-              )}
+            <div className="result-actions">
+              <button
+                onClick={handleCopy}
+                className="btn btn-secondary"
+                title="Copy short link"
+                type="button"
+              >
+                {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+              <ShareButton url={successResult.shortUrl} />
             </div>
           </div>
         </div>

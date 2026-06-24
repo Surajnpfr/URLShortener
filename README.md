@@ -147,7 +147,6 @@ Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`, `GE
 
 - [x] URL shortening service
 - [x] Custom aliases
-- [x] QR code generation
 - [x] Click analytics
 - [x] User authentication (Auth0 email/password)
 - [x] Dashboard for link management

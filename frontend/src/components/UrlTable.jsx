@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Search, Trash2, ExternalLink } from 'lucide-react';
 import CopyButton from './CopyButton';
+import ShareButton from './ShareButton';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -108,6 +109,7 @@ export default function UrlTable({ urls = [], onDelete, loading, error }) {
                         label="Copy"
                         copiedLabel="Copied"
                       />
+                      <ShareButton url={item.shortUrl} />
                       <a
                         href={item.shortUrl}
                         target="_blank"

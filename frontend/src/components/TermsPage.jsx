@@ -33,7 +33,7 @@ export default function TermsPage({ onNavigate }) {
       title: '2. Use of Services',
       icon: Globe,
       paragraphs: [
-        'Linkly provides URL shortening, analytics, QR code generation, and related link management tools. These services are provided to support lawful communication and distribution of content.',
+        'Linkly provides URL shortening, analytics, and related link management tools. These services are provided to support lawful communication and distribution of content.',
         'You agree to use the platform only for legitimate purposes and in compliance with applicable local, national, and international laws.'
       ]
     },

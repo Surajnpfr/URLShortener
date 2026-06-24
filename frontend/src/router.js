@@ -7,7 +7,7 @@ export const TAB_PATHS = {
   dashboard: '/dashboard',
   links: '/links',
   analytics: '/analytics',
-  qrcodes: '/qrcodes',
+  api: '/api-access',
   settings: '/settings',
 };
 
@@ -50,6 +50,10 @@ export function pathForSection(sectionId) {
 
 export function getRoute(pathname, hash = '') {
   const path = normalizePath(pathname);
+
+  if (path === '/qrcodes') {
+    return { view: 'app', tab: 'links' };
+  }
 
   if (TERMS_PATHS.has(path)) return { view: 'terms' };
   if (PRIVACY_PATHS.has(path)) return { view: 'privacy' };

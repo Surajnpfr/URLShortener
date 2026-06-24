@@ -54,8 +54,8 @@ export default function LandingPage({ onLoginRequired }) {
           <li>
             <span className="landing-strip-num">03</span>
             <div>
-              <strong>QR codes</strong>
-              <p>Download PNG or SVG for print, posters, or packaging.</p>
+              <strong>Share links</strong>
+              <p>Copy or share your short URL anywhere — messages, email, or social.</p>
             </div>
           </li>
         </ul>

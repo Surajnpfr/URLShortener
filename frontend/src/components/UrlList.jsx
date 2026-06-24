@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Typography } from './antd.jsx';
-import { copyToClipboard, downloadFile, drawQrCanvas, getQrSvgString, getShortDisplay } from './qrCodeUtils.jsx';
+import { copyToClipboard, getShortDisplay } from './linkUtils';
 import { 
-  Copy, Check, QrCode, Trash2, BarChart2, 
+  Copy, Check, Trash2, BarChart2, 
   Search,
-  MoreVertical
+  MoreVertical,
+  Share2,
 } from 'lucide-react';
 import AccountSettingsPage from './AccountSettingsPage';
+import ShareButton from './ShareButton';
 import { pathForTab } from '../router';
 import { fetchAnalyticsSummary, fetchLinkAnalytics } from '../lib/urlApi';
 
@@ -62,66 +63,11 @@ const AnalyticsChart = ({ clicksByDay }) => {
   );
 };
 
-const QrGalleryCard = ({ item, onCopy, onOpenQr }) => {
-  const [svgMarkup, setSvgMarkup] = useState('');
-
-  useEffect(() => {
-    let active = true;
-
-    const load = async () => {
-      const svg = await getQrSvgString(item.shortUrl);
-      if (active) {
-        setSvgMarkup(svg);
-      }
-    };
-
-    void load();
-
-    return () => {
-      active = false;
-    };
-  }, [item.shortUrl]);
-
-  const handleDownloadPng = async () => {
-    const canvas = document.createElement('canvas');
-    await drawQrCanvas(canvas, item.shortUrl);
-    downloadFile(canvas.toDataURL('image/png'), `qr-code-${item.shortCode}.png`, 'image/png');
-  };
-
-  const handleDownloadSvg = () => {
-    if (!svgMarkup) return;
-    downloadFile(svgMarkup, `qr-code-${item.shortCode}.svg`, 'image/svg+xml');
-  };
-
-  return (
-    <div className="qr-gallery-item">
-      <div className="qr-gallery-preview">
-        {svgMarkup ? <div dangerouslySetInnerHTML={{ __html: svgMarkup }} /> : <div className="qr-gallery-loading">Loading…</div>}
-      </div>
-      <div className="qr-gallery-copy">
-        <Typography.Text strong>{item.shortUrl}</Typography.Text>
-        <Typography.Text type="secondary">{truncateUrl(item.originalUrl)}</Typography.Text>
-      </div>
-      <div className="qr-gallery-actions">
-        <button type="button" className="btn-ghost-sm" onClick={() => onCopy(item._id, item.shortUrl)}>
-          <Copy size={14} /> Copy
-        </button>
-        <button type="button" className="btn-ghost-sm" onClick={handleDownloadPng}>PNG</button>
-        <button type="button" className="btn-ghost-sm" onClick={handleDownloadSvg}>SVG</button>
-        <button type="button" className="btn-ghost-sm btn-ghost-sm--primary" onClick={() => onOpenQr(item.shortUrl, item.shortCode)}>
-          <QrCode size={14} /> Open
-        </button>
-      </div>
-    </div>
-  );
-};
-
 export default function UrlList({
-  urls, activeTab, onDelete, onViewQr, onOpenAnalytics, onNavigate, onLogout,
+  urls, activeTab, onDelete, onOpenAnalytics, onNavigate, onLogout,
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [qrSearchQuery, setQrSearchQuery] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -137,6 +83,23 @@ export default function UrlList({
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
       console.error('Failed to copy: ', err);
+    }
+  };
+
+  const handleShare = async (shortUrl) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Linkly short link', url: shortUrl });
+      } else {
+        await copyToClipboard(shortUrl);
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      try {
+        await copyToClipboard(shortUrl);
+      } catch (copyError) {
+        console.error('Failed to share link:', copyError);
+      }
     }
   };
 
@@ -264,11 +227,6 @@ export default function UrlList({
     url.shortCode.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const qrFilteredUrls = urls.filter((url) => {
-    const query = qrSearchQuery.toLowerCase();
-    return url.originalUrl.toLowerCase().includes(query) || url.shortUrl.toLowerCase().includes(query);
-  });
-
   const rangeControls = (
     <div className="analytics-range-controls">
       {['7d', '30d', '90d', 'all'].map((range) => (
@@ -383,13 +341,12 @@ export default function UrlList({
                           >
                             <BarChart2 size={14} />
                           </button>
-                          <button
-                            onClick={() => onViewQr(item.shortUrl, item.shortCode)}
+                          <ShareButton
+                            url={item.shortUrl}
                             className="link-row-action"
-                            title="QR Code"
-                          >
-                            <QrCode size={14} />
-                          </button>
+                            iconOnly
+                            label=""
+                          />
                           <div className="actions-menu-wrapper" style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <button
                               onClick={() => setActiveMenuId(activeMenuId === item._id ? null : item._id)}
@@ -525,13 +482,13 @@ export default function UrlList({
                             </button>
                             <button
                               onClick={() => {
-                                onViewQr(item.shortUrl, item.shortCode);
+                                void handleShare(item.shortUrl);
                                 setActiveMenuId(null);
                               }}
                               className="dropdown-item"
                             >
-                              <QrCode size={13} />
-                              QR Code
+                              <Share2 size={13} />
+                              Share Link
                             </button>
                             <button
                               onClick={() => {
@@ -653,44 +610,6 @@ export default function UrlList({
               </div>
             )}
           </>
-        )}
-      </div>
-    );
-  }
-
-  if (activeTab === 'qrcodes') {
-    return (
-      <div className="dashboard-panel-body">
-        <div className="panel-toolbar panel-toolbar--compact">
-          <span className="panel-toolbar-meta">{qrFilteredUrls.length} QR code{qrFilteredUrls.length === 1 ? '' : 's'}</span>
-          <div className="input-wrapper panel-search qr-gallery-search">
-            <Search size={16} className="input-icon" />
-            <input
-              type="text"
-              placeholder="Search by short URL or original URL"
-              value={qrSearchQuery}
-              onChange={(event) => setQrSearchQuery(event.target.value)}
-              className="form-input"
-              style={{ padding: '10px 10px 10px 40px', borderRadius: '12px', fontSize: '0.875rem' }}
-            />
-          </div>
-        </div>
-
-        {qrFilteredUrls.length === 0 ? (
-          <div className="empty-state empty-state--inline">
-            <p>{urls.length === 0 ? 'QR codes are created when you shorten a link.' : 'No QR codes match your search.'}</p>
-          </div>
-        ) : (
-          <div className="qr-gallery-list">
-            {qrFilteredUrls.map((item) => (
-              <QrGalleryCard
-                key={item._id}
-                item={item}
-                onCopy={handleCopy}
-                onOpenQr={onViewQr}
-              />
-            ))}
-          </div>
         )}
       </div>
     );

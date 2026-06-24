@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Link2, Sun, Moon, BarChart2, 
-  Settings, Home, QrCode, 
-  CreditCard
+  Settings, Home, 
+  CreditCard, Terminal
 } from 'lucide-react';
+import UserApiPage from './components/UserApiPage';
 import ShortenerForm from './components/ShortenerForm';
 import UrlList from './components/UrlList';
 import Dashboard from './pages/Dashboard';
-import QrModal from './components/QrModal';
 import TermsPage from './components/TermsPage';
 import PrivacyPage from './components/PrivacyPage';
 import LoginPage from './components/LoginPage';
@@ -32,7 +32,7 @@ const PANEL_TITLES = {
   dashboard: 'Dashboard',
   links: 'Links',
   analytics: 'Analytics',
-  qrcodes: 'QR Codes',
+  api: 'API',
   settings: 'Settings',
 };
 
@@ -58,11 +58,6 @@ export default function App() {
   // Pro Upgrade Billing state
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [billingLoading, setBillingLoading] = useState(false);
-
-  // QR Modal State
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrUrl, setQrUrl] = useState('');
-  const [qrShortCode, setQrShortCode] = useState('');
 
   const checkSession = useCallback(async () => {
     try {
@@ -245,12 +240,6 @@ export default function App() {
     }
   };
 
-  const handleOpenQr = (url, shortCode) => {
-    setQrUrl(url);
-    setQrShortCode(shortCode);
-    setQrModalOpen(true);
-  };
-
   const handleLogout = () => {
     if (!window.confirm('Are you sure you want to log out?')) {
       return;
@@ -404,11 +393,11 @@ export default function App() {
                     </li>
                     <li className="sidebar-item">
                       <button
-                        onClick={() => navigate(pathForTab('qrcodes'))}
-                        className={`sidebar-link ${activeTab === 'qrcodes' ? 'active' : ''}`}
+                        onClick={() => navigate(pathForTab('api'))}
+                        className={`sidebar-link ${activeTab === 'api' ? 'active' : ''}`}
                       >
-                        <QrCode size={18} />
-                        QR Codes
+                        <Terminal size={18} />
+                        API
                       </button>
                     </li>
                     <li className="sidebar-item">
@@ -437,14 +426,14 @@ export default function App() {
                         urlsError={urlsError}
                         onShortenSuccess={() => void fetchData()}
                         onDelete={handleDelete}
-                        onViewQr={handleOpenQr}
                       />
+                    ) : activeTab === 'api' ? (
+                      <UserApiPage user={appUser} urls={urls} />
                     ) : (
                       <UrlList
                         urls={urls}
                         activeTab={activeTab}
                         onDelete={handleDelete}
-                        onViewQr={handleOpenQr}
                         onOpenAnalytics={() => navigate(pathForTab('analytics'))}
                         onNavigate={navigate}
                         onLogout={handleLogout}
@@ -510,13 +499,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      <QrModal
-        isOpen={qrModalOpen}
-        onClose={() => setQrModalOpen(false)}
-        url={qrUrl}
-        shortCode={qrShortCode}
-      />
     </>
   );
 }

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Link2, Check, QrCode, AlertCircle, ExternalLink } from 'lucide-react';
+import { Link2, Check, AlertCircle, ExternalLink } from 'lucide-react';
 import { shortenUrl } from '../services/api';
 import CopyButton from './CopyButton';
+import ShareButton from './ShareButton';
 
-export default function UrlForm({ onSuccess, onViewQr }) {
+export default function UrlForm({ onSuccess }) {
   const inputRef = useRef(null);
   const [url, setUrl] = useState('');
   const [customAlias, setCustomAlias] = useState('');
@@ -121,6 +122,7 @@ export default function UrlForm({ onSuccess, onViewQr }) {
             </div>
             <div className="result-actions">
               <CopyButton text={successResult.shortUrl} />
+              <ShareButton url={successResult.shortUrl} />
               <a
                 href={successResult.shortUrl}
                 target="_blank"
@@ -130,16 +132,6 @@ export default function UrlForm({ onSuccess, onViewQr }) {
                 <ExternalLink size={16} />
                 Open
               </a>
-              {onViewQr && (
-                <button
-                  type="button"
-                  onClick={() => onViewQr(successResult.shortUrl, successResult.shortCode)}
-                  className="btn btn-secondary btn-icon"
-                  title="View QR Code"
-                >
-                  <QrCode size={16} />
-                </button>
-              )}
             </div>
           </div>
         </div>

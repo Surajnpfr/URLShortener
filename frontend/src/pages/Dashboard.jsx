@@ -16,7 +16,6 @@ export default function Dashboard({
   urlsError = null,
   onShortenSuccess,
   onDelete,
-  onViewQr,
 }) {
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -97,7 +96,7 @@ export default function Dashboard({
   return (
     <div className="dashboard-panel-body">
       <div id="shortener-section" className="dashboard-shortener-wrap">
-        <UrlForm onSuccess={handleShortenSuccess} onViewQr={onViewQr} />
+        <UrlForm onSuccess={handleShortenSuccess} />
       </div>
 
       <div style={{ marginTop: '24px' }}>
