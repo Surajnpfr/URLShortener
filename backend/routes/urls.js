@@ -2,6 +2,7 @@ const express = require('express');
 const Url = require('../models/Url');
 const { requireAuth } = require('../middleware/auth');
 const { buildShortUrl, getShortLinkBaseUrl } = require('../config/env');
+const { validateAndNormalizeUrl } = require('../utils/validateUrl');
 
 const router = express.Router();
 
@@ -30,20 +31,12 @@ function formatUrlItem(req, item) {
 async function handleShorten(req, res) {
   const { url, customAlias, redirectType, shortCodeLength } = req.body;
 
-  if (!url) {
-    return res.status(400).json({ error: 'Original URL is required' });
+  const validation = validateAndNormalizeUrl(url);
+  if (!validation.ok) {
+    return res.status(400).json({ error: validation.error });
   }
 
-  let targetUrl = url.trim();
-  if (!/^https?:\/\//i.test(targetUrl)) {
-    targetUrl = `https://${targetUrl}`;
-  }
-
-  try {
-    new URL(targetUrl);
-  } catch (err) {
-    return res.status(400).json({ error: 'Invalid URL format' });
-  }
+  const targetUrl = validation.url;
 
   try {
     let shortCode;
@@ -106,6 +99,8 @@ router.get('/', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Server error fetching URLs' });
   }
 });
+
+router.post('/', requireAuth, handleShorten);
 
 router.delete('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;

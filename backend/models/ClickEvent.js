@@ -32,6 +32,11 @@ const ClickEventSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  ipHash: {
+    type: String,
+    default: '',
+    index: true,
+  },
 });
 
 ClickEventSchema.index({ user: 1, clickedAt: -1 });
@@ -50,7 +55,51 @@ class MockClickEventDocument {
     this.referrer = data.referrer || '';
     this.userAgent = data.userAgent || '';
     this.visitorHash = data.visitorHash;
+    this.ipHash = data.ipHash || '';
   }
+}
+
+function matchesMockQuery(row, query = {}) {
+  return Object.entries(query).every(([key, value]) => {
+    if (value && typeof value === 'object' && value.$gte !== undefined) {
+      return new Date(row[key]) >= new Date(value.$gte);
+    }
+    if (value && typeof value === 'object' && value.$in) {
+      return value.$in.some((v) => String(v) === String(row[key]));
+    }
+    return String(row[key]) === String(value);
+  });
+}
+
+function buildMockFindQuery(query = {}) {
+  let rows = mockClicks
+    .filter((item) => matchesMockQuery(item, query))
+    .map((item) => new MockClickEventDocument(item));
+
+  const chain = {
+    sort(sortSpec) {
+      if (sortSpec && typeof sortSpec === 'object') {
+        const [[field, dir]] = Object.entries(sortSpec);
+        rows.sort((a, b) => {
+          const av = a[field];
+          const bv = b[field];
+          if (av < bv) return dir === 1 ? -1 : 1;
+          if (av > bv) return dir === 1 ? 1 : -1;
+          return 0;
+        });
+      }
+      return chain;
+    },
+    limit(n) {
+      rows = rows.slice(0, n);
+      return chain;
+    },
+    then(resolve, reject) {
+      return Promise.resolve(rows).then(resolve, reject);
+    },
+  };
+
+  return chain;
 }
 
 const MockClickEventModel = {
@@ -65,17 +114,7 @@ const MockClickEventModel = {
 
     for (const stage of pipeline) {
       if (stage.$match) {
-        rows = rows.filter((row) => {
-          return Object.entries(stage.$match).every(([key, value]) => {
-            if (value && typeof value === 'object' && value.$gte) {
-              return new Date(row[key]) >= new Date(value.$gte);
-            }
-            if (value && typeof value === 'object' && value.$in) {
-              return value.$in.some((v) => String(v) === String(row[key]));
-            }
-            return String(row[key]) === String(value);
-          });
-        });
+        rows = rows.filter((row) => matchesMockQuery(row, stage.$match));
       }
 
       if (stage.$group) {
@@ -131,13 +170,7 @@ const MockClickEventModel = {
     return rows;
   },
 
-  find: (query = {}) => ({
-    sort: () => Promise.resolve(
-      mockClicks
-        .filter((item) => Object.entries(query).every(([k, v]) => String(item[k]) === String(v)))
-        .map((item) => new MockClickEventDocument(item)),
-    ),
-  }),
+  find: (query = {}) => buildMockFindQuery(query),
 };
 
 const ClickEvent = {

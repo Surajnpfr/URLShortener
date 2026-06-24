@@ -260,13 +260,63 @@ async function getLinkClicksByDay(userId, urlId, range) {
   return rows;
 }
 
+async function getRecentClicks(userId, range, limit = 10) {
+  const match = buildDateMatch(userId, range);
+
+  if (getDbMode() === 'MOCK') {
+    const events = await ClickEvent.find(match).sort({ clickedAt: -1 }).limit(limit);
+    const urls = await Promise.all(events.map((event) => Url.findById(event.url)));
+    return events.map((event, index) => ({
+      urlId: event.url,
+      shortCode: urls[index]?.shortCode || '',
+      originalUrl: urls[index]?.originalUrl || '',
+      clickedAt: event.clickedAt,
+      referrer: event.referrer || '',
+      visitorHash: event.visitorHash,
+      ipHash: event.ipHash || '',
+      userAgent: event.userAgent || '',
+    }));
+  }
+
+  const rows = await ClickEvent.aggregate([
+    { $match: match },
+    { $sort: { clickedAt: -1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'urls',
+        localField: 'url',
+        foreignField: '_id',
+        as: 'urlDoc',
+      },
+    },
+    { $unwind: { path: '$urlDoc', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        urlId: '$url',
+        shortCode: '$urlDoc.shortCode',
+        originalUrl: '$urlDoc.originalUrl',
+        clickedAt: 1,
+        referrer: 1,
+        visitorHash: 1,
+        ipHash: 1,
+        userAgent: 1,
+      },
+    },
+  ]);
+
+  return rows;
+}
+
 async function getSummary(userId, range) {
-  const [totalClicks, uniqueVisitors, linkCount, clicksByDay, topLinks] = await Promise.all([
+  const [totalClicks, uniqueVisitors, linkCount, clicksByDay, topLinks, recentClicks] = await Promise.all([
     getTotalClicks(userId, range),
     getUniqueVisitors(userId, range),
     Url.countDocuments({ user: userId }),
     aggregateClicksByDay(userId, range),
     getTopLinks(userId, range, 5),
+    getRecentClicks(userId, range, 10),
   ]);
 
   return {
@@ -275,6 +325,10 @@ async function getSummary(userId, range) {
     linkCount,
     clicksByDay,
     topLinks,
+    totalUrls: linkCount,
+    clicksByDate: clicksByDay,
+    topUrls: topLinks,
+    recentClicks,
   };
 }
 
@@ -335,6 +389,7 @@ async function getLinkAnalytics(userId, urlId, range) {
 module.exports = {
   getSummary,
   getLinkAnalytics,
+  getRecentClicks,
   aggregateClicksByDay,
   getLinkClicksByDay,
 };

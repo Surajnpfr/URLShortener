@@ -1,10 +1,11 @@
 const ClickEvent = require('../models/ClickEvent');
-const { getVisitorHash } = require('../utils/visitorHash');
+const { getVisitorHash, getIpHash } = require('../utils/visitorHash');
 
 async function recordClick(urlDoc, req) {
   const referrer = req.get('referer') || req.get('referrer') || '';
   const userAgent = req.get('user-agent') || '';
   const visitorHash = getVisitorHash(req);
+  const ipHash = getIpHash(req);
 
   await ClickEvent.create({
     url: urlDoc._id,
@@ -12,6 +13,7 @@ async function recordClick(urlDoc, req) {
     referrer,
     userAgent,
     visitorHash,
+    ipHash,
     clickedAt: new Date(),
   });
 

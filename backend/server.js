@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const { connectDB, getDbMode } = require('./config/db');
+const { connectDB, getDbMode, isDatabaseReady } = require('./config/db');
 const { createAuth0Middleware, getMissingAuth0Config, isAllowedReturnTo, getDefaultLogoutReturnTo } = require('./config/auth0Session');
 const {
   buildShortUrl,
@@ -17,6 +17,7 @@ const authRoutes = require('./routes/auth');
 const urlsRoutes = require('./routes/urls');
 const analyticsRoutes = require('./routes/analytics');
 const { requireAuth } = require('./middleware/auth');
+const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -134,7 +135,15 @@ async function handleShortCodeRedirect(req, res, shortCode) {
     return res.status(404).send(renderNotFoundPage(baseUrl));
   }
 
-  await recordClick(urlDoc, req);
+  try {
+    await recordClick(urlDoc, req);
+  } catch (error) {
+    console.error('[clickTracking] Failed to record click:', {
+      shortCode,
+      urlId: urlDoc._id,
+      message: error.message,
+    });
+  }
 
   const holdingUrl = getHoldingPageUrl(shortCode);
   if (holdingUrl) {
@@ -170,6 +179,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
     dbMode: getDbMode(),
+    dbReady: isDatabaseReady(),
   });
 });
 
@@ -226,22 +236,8 @@ app.get('/:shortCode([a-zA-Z0-9-_]{3,30})', async (req, res) => {
   await handleRootShortCodeRedirect(req, res, req.params.shortCode);
 });
 
-app.use((req, res) => {
-  res.status(404).json({
-    status: 404,
-    error: 'Not Found',
-    message: `Cannot ${req.method} ${req.originalUrl}`,
-  });
-});
-
-app.use((err, req, res, next) => {
-  console.error('Uncaught Global Exception:', err.stack || err);
-  res.status(500).json({
-    status: 500,
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message,
-  });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 async function startServer() {
   await connectDB();
