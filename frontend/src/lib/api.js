@@ -27,9 +27,9 @@ export function getAuthSignupUrl(returnPath = '/dashboard') {
 }
 
 export function getAuthLogoutUrl() {
-  const returnTo = encodeURIComponent(window.location.origin);
+  // Hits the API logout route; the server sets Auth0 returnTo to FRONTEND_URL (dashboard).
   const base = API_BASE_URL.replace(/\/$/, '');
-  return `${base}/logout?returnTo=${returnTo}`;
+  return `${base}/logout`;
 }
 
 export async function apiFetch(path, options = {}) {

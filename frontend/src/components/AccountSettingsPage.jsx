@@ -41,7 +41,6 @@ export default function AccountSettingsPage({ onNavigate, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [nameDraft, setNameDraft] = useState('');
   const [savingName, setSavingName] = useState(false);
-  const [logoutLoading, setLogoutLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,17 +99,10 @@ export default function AccountSettingsPage({ onNavigate, onLogout }) {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (!window.confirm('Log out of your account?')) return;
-    setLogoutLoading(true);
-    try {
-      if (typeof onLogout === 'function') {
-        await onLogout();
-      }
-    } finally {
-      setAccount(null);
-      setNameDraft('');
-      setLogoutLoading(false);
+    if (typeof onLogout === 'function') {
+      onLogout();
     }
   };
 
@@ -183,9 +175,9 @@ export default function AccountSettingsPage({ onNavigate, onLogout }) {
           <>
             <p className="settings-session-line">Signed in as {account.email}</p>
             <div className="settings-action-row">
-              <ActionButton danger outlined onClick={handleLogout} disabled={logoutLoading}>
+              <ActionButton danger outlined onClick={handleLogout}>
                 <LogOut size={14} />
-                {logoutLoading ? 'Logging out…' : 'Log out'}
+                Log out
               </ActionButton>
             </div>
           </>

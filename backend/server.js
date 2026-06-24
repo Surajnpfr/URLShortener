@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const { connectDB, getDbMode } = require('./config/db');
-const { createAuth0Middleware, getMissingAuth0Config, isAllowedReturnTo } = require('./config/auth0Session');
+const { createAuth0Middleware, getMissingAuth0Config, isAllowedReturnTo, getDefaultLogoutReturnTo } = require('./config/auth0Session');
 const {
   buildShortUrl,
   getAllowedDashboardOrigins,
@@ -72,6 +72,12 @@ if (auth0Middleware) {
     res.oidc.login({
       returnTo: req.query.returnTo || undefined,
     });
+  });
+
+  app.get('/logout', (req, res) => {
+    // Always send users to the dashboard after Auth0 logout — never BASE_URL (API host).
+    const returnTo = getDefaultLogoutReturnTo();
+    return res.oidc.logout({ returnTo });
   });
 } else {
   const authNotConfiguredHandler = (req, res) => {

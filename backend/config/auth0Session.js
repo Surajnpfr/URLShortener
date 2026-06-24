@@ -1,9 +1,15 @@
 const { auth } = require('express-openid-connect');
 const { getAllowedDashboardOrigins } = require('./env');
 
-function getDefaultReturnTo() {
+function getDefaultLogoutReturnTo() {
+  // Auth0 "returnTo" after logout — must be the React dashboard (FRONTEND_URL),
+  // never BASE_URL (https://app.drovashop.com).
   const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
-  return `${frontend.replace(/\/$/, '')}/dashboard`;
+  return frontend.replace(/\/$/, '');
+}
+
+function getDefaultReturnTo() {
+  return `${getDefaultLogoutReturnTo()}/dashboard`;
 }
 
 function getSessionCookieOptions(baseURL) {
@@ -48,6 +54,22 @@ function isAllowedReturnTo(returnTo) {
   }
 }
 
+function warnIfLogoutTargetIsApiHost() {
+  try {
+    const logoutReturn = getDefaultLogoutReturnTo();
+    const apiBase = (process.env.BASE_URL || '').replace(/\/$/, '');
+    if (!logoutReturn || !apiBase) return;
+
+    if (new URL(logoutReturn).origin === new URL(apiBase).origin) {
+      console.warn(
+        '[Auth0] FRONTEND_URL must not equal BASE_URL. Logout will redirect to the API host instead of the dashboard.',
+      );
+    }
+  } catch {
+    // ignore invalid URLs during startup
+  }
+}
+
 function getMissingAuth0Config() {
   const missing = [];
   if (!process.env.ISSUER_BASE_URL) missing.push('ISSUER_BASE_URL');
@@ -71,6 +93,9 @@ function createAuth0Middleware() {
     return null;
   }
 
+  const postLogoutRedirect = getDefaultLogoutReturnTo();
+  warnIfLogoutTargetIsApiHost();
+
   return auth({
     authRequired: false,
     auth0Logout: true,
@@ -81,6 +106,8 @@ function createAuth0Middleware() {
     issuerBaseURL,
     routes: {
       login: false,
+      logout: false,
+      postLogoutRedirect,
     },
     authorizationParams: {
       response_type: 'code',
@@ -102,6 +129,7 @@ function createAuth0Middleware() {
 module.exports = {
   createAuth0Middleware,
   getDefaultReturnTo,
+  getDefaultLogoutReturnTo,
   getMissingAuth0Config,
   isAllowedReturnTo,
 };

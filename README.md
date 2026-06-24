@@ -91,21 +91,22 @@ This project uses the [Auth0 Express SDK](https://github.com/auth0/express-openi
 
 1. In Auth0 Dashboard → **Applications**, use a **Regular Web Application**.
    - **Token Endpoint Authentication Method:** `POST` (`client_secret_post`)
-   - **Allowed Callback URLs:** `http://localhost:5000/callback`, `https://app.drovashop.com/callback`
-   - **Allowed Logout URLs:** `http://localhost:5173`, `https://drovashop.com`, `https://www.drovashop.com`
+   - **Allowed Callback URLs:** `{BASE_URL}/callback` (local: `http://localhost:5000/callback`)
+   - **Allowed Logout URLs:** your dashboard origin (`FRONTEND_URL`; local: `http://localhost:5173`)
+   - **Allowed Web Origins:** same as your dashboard origin(s)
 2. Copy **Client ID** and **Client Secret** into `backend/.env` (never commit secrets).
 3. Set backend env vars (see `backend/.env.example`):
-   - `ISSUER_BASE_URL=https://nerdy.jp.auth0.com`
+   - `ISSUER_BASE_URL` — your Auth0 tenant domain
    - `CLIENT_ID`, `CLIENT_SECRET`, `SECRET`, `BASE_URL`, `FRONTEND_URL`
 4. Generate a session secret: `openssl rand -hex 32` → `SECRET`
-5. Set `VITE_API_URL` in `frontend/.env.production` for production builds
+5. Set `VITE_API_URL` in `frontend/.env.production` to your API host (`BASE_URL`)
 6. Ensure `ALLOWED_DASHBOARD_ORIGINS` includes the React app origin
 
 ### Auth routes (Express + Auth0 SDK)
 
 - `GET /login` — start login (supports `?returnTo=` full frontend URL)
 - `GET /signup` — start signup (`screen_hint=signup`)
-- `GET /logout` — end session (supports `?returnTo=`)
+- `GET /logout` — end session; Auth0 `returnTo` is always `FRONTEND_URL` (dashboard, not the API host)
 - `GET /callback` — Auth0 OAuth callback (automatic)
 
 ### Protected API routes (session cookie)

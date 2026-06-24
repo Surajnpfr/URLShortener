@@ -235,7 +235,11 @@ export default function App() {
     if (!window.confirm('Are you sure you want to log out?')) {
       return;
     }
-    window.location.href = getAuthLogoutUrl();
+    sessionStorage.removeItem(AUTH_LOOP_KEY);
+    setAppUser(null);
+    setIsAuthenticated(false);
+    setAuthError(null);
+    window.location.assign(getAuthLogoutUrl());
   };
 
   // Upgrade checkout billing handler
