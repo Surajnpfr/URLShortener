@@ -18,6 +18,7 @@ function generateShortCode(length = 6) {
 function formatUrlItem(req, item) {
   const baseUrl = getShortLinkBaseUrl(req);
   return {
+    id: item._id,
     _id: item._id,
     originalUrl: item.originalUrl,
     shortCode: item.shortCode,
@@ -101,6 +102,24 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 router.post('/', requireAuth, handleShorten);
+
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const doc = await Url.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ error: 'Shortened URL not found' });
+    }
+
+    if (String(doc.user) !== String(req.user._id)) {
+      return res.status(403).json({ error: 'You do not have permission to view this link' });
+    }
+
+    return res.json(formatUrlItem(req, doc));
+  } catch (error) {
+    console.error('Error fetching URL:', error);
+    res.status(500).json({ error: 'Server error fetching URL' });
+  }
+});
 
 router.delete('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;

@@ -6,12 +6,13 @@ import {
 } from 'lucide-react';
 import ShortenerForm from './components/ShortenerForm';
 import UrlList from './components/UrlList';
+import Dashboard from './pages/Dashboard';
 import QrModal from './components/QrModal';
 import TermsPage from './components/TermsPage';
 import PrivacyPage from './components/PrivacyPage';
 import LoginPage from './components/LoginPage';
 import LandingPage from './components/LandingPage';
-import { getApiBaseUrl, getAuthLoginUrl, getAuthSignupUrl, getAuthLogoutUrl, apiFetch, readJson } from './lib/api';
+import { getApiBaseUrl, getAuthLoginUrl, getAuthSignupUrl, getAuthLogoutUrl, apiFetch, readJson, setUnauthorizedHandler } from './lib/api';
 import { deleteUrl, fetchUrls, fetchCurrentUser } from './lib/urlApi';
 import {
   getRoute,
@@ -37,6 +38,8 @@ const PANEL_TITLES = {
 
 export default function App() {
   const [urls, setUrls] = useState([]);
+  const [urlsLoading, setUrlsLoading] = useState(false);
+  const [urlsError, setUrlsError] = useState(null);
   const [dbMode, setDbMode] = useState('MONGODB');
   const [appUser, setAppUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -83,6 +86,13 @@ export default function App() {
       setIsAuthenticated(false);
       return false;
     }
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      window.location.assign(getAuthLoginUrl('/dashboard'));
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   useEffect(() => {
@@ -189,13 +199,20 @@ export default function App() {
 
       if (!isAuthenticated) {
         setUrls([]);
+        setUrlsError(null);
         setAppUser(null);
         return;
       }
 
+      setUrlsLoading(true);
+      setUrlsError(null);
+
       const [userData, urlsData] = await Promise.all([
         fetchCurrentUser().catch(() => null),
-        fetchUrls().catch(() => []),
+        fetchUrls().catch((error) => {
+          setUrlsError(error.message || 'Failed to load URLs.');
+          return [];
+        }),
       ]);
 
       if (userData?.user) {
@@ -204,6 +221,9 @@ export default function App() {
       setUrls(Array.isArray(urlsData) ? urlsData : []);
     } catch (error) {
       console.error('Error loading data:', error);
+      setUrlsError(error.message || 'Failed to load data.');
+    } finally {
+      setUrlsLoading(false);
     }
   }, [isAuthenticated]);
 
@@ -409,24 +429,28 @@ export default function App() {
                   </div>
 
                   <div className="dashboard-panel-content">
-                    <div id="shortener-section" className="dashboard-shortener-wrap">
-                      <ShortenerForm
-                        variant="dashboard"
+                    {['dashboard', 'links', 'analytics'].includes(activeTab) ? (
+                      <Dashboard
+                        activeTab={activeTab}
+                        urls={urls}
+                        urlsLoading={urlsLoading}
+                        urlsError={urlsError}
                         onShortenSuccess={() => void fetchData()}
+                        onDelete={handleDelete}
                         onViewQr={handleOpenQr}
                       />
-                    </div>
-
-                    <UrlList
-                      urls={urls}
-                      activeTab={activeTab}
-                      onDelete={handleDelete}
-                      onViewQr={handleOpenQr}
-                      onOpenAnalytics={() => navigate(pathForTab('analytics'))}
-                      onNavigate={navigate}
-                      onLogout={handleLogout}
-                      dbMode={dbMode}
-                    />
+                    ) : (
+                      <UrlList
+                        urls={urls}
+                        activeTab={activeTab}
+                        onDelete={handleDelete}
+                        onViewQr={handleOpenQr}
+                        onOpenAnalytics={() => navigate(pathForTab('analytics'))}
+                        onNavigate={navigate}
+                        onLogout={handleLogout}
+                        dbMode={dbMode}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

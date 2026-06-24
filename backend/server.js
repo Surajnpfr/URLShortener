@@ -18,6 +18,8 @@ const urlsRoutes = require('./routes/urls');
 const analyticsRoutes = require('./routes/analytics');
 const { requireAuth } = require('./middleware/auth');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+const swaggerUi = require('swagger-ui-express');
+const { getSwaggerSpec } = require('./docs/swagger');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -182,6 +184,10 @@ app.get('/api/status', (req, res) => {
     dbReady: isDatabaseReady(),
   });
 });
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(getSwaggerSpec(), {
+  customSiteTitle: 'Linkly API Docs',
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/urls', urlsRoutes);

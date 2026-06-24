@@ -65,25 +65,40 @@ npm run dev
 
 📌 API Endpoints
 
+Interactive API docs (Swagger UI): `{BASE_URL}/api/docs` (e.g. `https://app.drovashop.com/api/docs`). Protected routes require an Auth0 session cookie — open `GET /login` in the same browser first.
+
 Create Short URL
 
-POST /api/shorten
+POST /api/urls
 
 Request:
 
 {
-  "url": "https://example.com/very/long/url"
+  "originalUrl": "https://example.com/very/long/url"
 }
 
 Response:
 
 {
-  "shortUrl": "http://localhost:5000/abc123"
+  "id": "...",
+  "originalUrl": "https://example.com/very/long/url",
+  "shortCode": "abc123",
+  "shortUrl": "https://drovashop.com/go/abc123",
+  "clicks": 0,
+  "createdAt": "..."
 }
+
+Alias: `POST /api/shorten` (same behavior).
+
+List / get / delete URLs
+
+- `GET /api/urls` — list current user's links
+- `GET /api/urls/:id` — single link (ownership enforced)
+- `DELETE /api/urls/:id` — delete link
 
 Redirect to Original URL
 
-GET /:shortCode
+GET /go/:shortCode (or `/:shortCode` when `SHORT_LINK_PATH` is empty)
 
 ## Auth0 setup (Regular Web Application)
 
@@ -113,10 +128,20 @@ This project uses the [Auth0 Express SDK](https://github.com/auth0/express-openi
 
 - `GET /api/auth/me` — current user profile
 - `PATCH /api/auth/me` — update display name
-- `GET /api/urls`, `POST /api/shorten`, `DELETE /api/urls/:id`
+- `GET /api/urls`, `POST /api/urls`, `GET /api/urls/:id`, `DELETE /api/urls/:id`
+- `POST /api/shorten` — alias for `POST /api/urls`
 - `GET /api/analytics/summary`, `GET /api/analytics/links/:urlId`
 
-Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`
+Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`, `GET /api/docs`
+
+### Production deploy checklist
+
+1. **MongoDB** — set `DATABASE_URL` or `MONGODB_URI` on the API server.
+2. **Auth0** — callback on API host (`BASE_URL/callback`); logout on dashboard (`FRONTEND_URL`).
+3. **CORS** — `ALLOWED_DASHBOARD_ORIGINS` includes the React app origin(s).
+4. **Frontend build** — `VITE_API_URL` = API host (`https://app.drovashop.com`).
+5. **Short links** — `SHORT_LINK_BASE_URL` = public link domain; `SHORT_LINK_PATH` = `/go` or empty for root-level codes.
+6. **Verify** — `GET /api/status` shows `dbReady: true`; open `/api/docs` and test after logging in via `/login`.
 
 🎯 Roadmap
 
