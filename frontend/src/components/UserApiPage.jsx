@@ -20,7 +20,7 @@ function buildExamples(apiBase, path, method = 'GET', body = null) {
     ? ` \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(body)}'`
     : '';
 
-  const curl = `curl -X ${method} "${url}" \\\n  -H "Authorization: Bearer ${API_KEY_PLACEHOLDER}"${curlBody}`;
+  const curl = `curl -X ${method} "${url}" \\\n  -H "Authorization: Bearer ${API_KEY_PLACEHOLDER}" \\\n  -H "X-API-Key: ${API_KEY_PLACEHOLDER}"${curlBody}`;
 
   const javascript = body
     ? `const res = await fetch('${url}', {

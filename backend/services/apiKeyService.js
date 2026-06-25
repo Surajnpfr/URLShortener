@@ -41,23 +41,34 @@ function getDisplayPrefix(plainKey) {
   return plainKey.slice(0, Math.min(16, plainKey.length));
 }
 
+function normalizeApiKeyToken(token) {
+  if (!token || typeof token !== 'string') {
+    return null;
+  }
+
+  const cleaned = token.trim().replace(/^Bearer\s+/i, '').trim();
+  if (!cleaned.startsWith(KEY_PREFIX)) {
+    return null;
+  }
+
+  return cleaned;
+}
+
 function extractBearerToken(req) {
-  const header = req.headers?.authorization;
-  if (!header || typeof header !== 'string') {
-    return null;
+  const authorization = req.headers?.authorization;
+  if (authorization && typeof authorization === 'string') {
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    if (match) {
+      return normalizeApiKeyToken(match[1]);
+    }
   }
 
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) {
-    return null;
+  const apiKeyHeader = req.headers?.['x-api-key'];
+  if (apiKeyHeader && typeof apiKeyHeader === 'string') {
+    return normalizeApiKeyToken(apiKeyHeader);
   }
 
-  const token = match[1].trim();
-  if (!token.startsWith(KEY_PREFIX)) {
-    return null;
-  }
-
-  return token;
+  return null;
 }
 
 function formatApiKeyMetadata(record) {

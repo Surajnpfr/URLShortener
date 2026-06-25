@@ -1,7 +1,7 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 
 const apiBaseUrl = process.env.BASE_URL || 'http://localhost:5000';
-const dualAuth = [{ bearerAuth: [] }, { cookieAuth: [] }];
+const dualAuth = [{ bearerAuth: [] }, { apiKeyHeader: [] }, { cookieAuth: [] }];
 const sessionOnly = [{ cookieAuth: [] }];
 
 const options = {
@@ -34,6 +34,12 @@ const options = {
           scheme: 'bearer',
           bearerFormat: 'API key',
           description: 'Per-user API key (lk_live_...) from POST /api/auth/api-key',
+        },
+        apiKeyHeader: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'X-API-Key',
+          description: 'Same lk_live_... key — use if your host strips Authorization (common on shared hosting)',
         },
       },
       schemas: {
