@@ -1,5 +1,9 @@
 const User = require('../models/User');
 const { getDbMode, isDatabaseReady } = require('../config/db');
+const {
+  authenticateApiKey,
+  extractBearerToken,
+} = require('../services/apiKeyService');
 
 class SyncUserError extends Error {
   constructor(message, code, details = {}) {
@@ -177,13 +181,84 @@ function formatSyncErrorResponse(error) {
   };
 }
 
+async function resolveUserFromSession(req) {
+  if (!req.oidc?.isAuthenticated()) {
+    return null;
+  }
+
+  await syncUserFromOidc(req);
+  req.authMethod = 'session';
+  return req.user;
+}
+
+async function resolveUserFromApiKey(req) {
+  const bearerToken = extractBearerToken(req);
+  if (!bearerToken) {
+    return null;
+  }
+
+  const result = await authenticateApiKey(bearerToken);
+  if (!result) {
+    console.warn('[auth/api-key] invalid key attempt', {
+      prefix: bearerToken.slice(0, 16),
+      path: req.originalUrl,
+    });
+    return null;
+  }
+
+  req.user = result.user;
+  req.apiKey = result.apiKey;
+  req.authMethod = 'api_key';
+  return req.user;
+}
+
+async function resolveUserFromRequest(req) {
+  const apiUser = await resolveUserFromApiKey(req);
+  if (apiUser) {
+    return apiUser;
+  }
+
+  return resolveUserFromSession(req);
+}
+
 function requireAuth(req, res, next) {
+  return resolveUserFromRequest(req)
+    .then((user) => {
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      return next();
+    })
+    .catch((error) => {
+      if (error instanceof SyncUserError) {
+        logSyncFailure(error, {
+          auth0Id: req.oidc?.user?.sub,
+          email: req.oidc?.user?.email,
+          dbMode: getDbMode(),
+          dbReady: isDatabaseReady(),
+          path: req.originalUrl,
+        });
+
+        const body = formatSyncErrorResponse(error);
+        const status = error.code === 'DB_NOT_READY' ? 503 : 500;
+        return res.status(status).json(body);
+      }
+
+      console.error('[auth] resolve failed:', error.message);
+      return res.status(500).json({ error: 'Authentication failed' });
+    });
+}
+
+function requireSessionAuth(req, res, next) {
   if (!req.oidc?.isAuthenticated()) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   return syncUserFromOidc(req)
-    .then(() => next())
+    .then(() => {
+      req.authMethod = 'session';
+      return next();
+    })
     .catch((error) => {
       logSyncFailure(error, {
         auth0Id: req.oidc?.user?.sub,
@@ -212,7 +287,9 @@ function formatUserResponse(user) {
 
 module.exports = {
   requireAuth,
+  requireSessionAuth,
   formatUserResponse,
   syncUserFromOidc,
+  resolveUserFromRequest,
   SyncUserError,
 };

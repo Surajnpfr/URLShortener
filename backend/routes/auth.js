@@ -1,6 +1,6 @@
 const express = require('express');
 const User = require('../models/User');
-const { requireAuth, formatUserResponse, syncUserFromOidc } = require('../middleware/auth');
+const { requireAuth, requireSessionAuth, formatUserResponse } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -10,36 +10,20 @@ router.get('/session', (req, res) => {
   });
 });
 
-router.get('/me', async (req, res) => {
-  if (!req.oidc?.isAuthenticated()) {
-    return res.status(401).json({ error: 'Unauthorized' });
+router.get('/me', requireAuth, (req, res) => {
+  const payload = {
+    user: formatUserResponse(req.user),
+    authMethod: req.authMethod || 'session',
+  };
+
+  if (req.authMethod === 'api_key') {
+    payload.apiKeyPrefix = req.apiKey?.keyPrefix || null;
   }
 
-  try {
-    await syncUserFromOidc(req);
-    return res.json({
-      user: formatUserResponse(req.user),
-    });
-  } catch (error) {
-    console.error('[auth/me] sync failed:', error.message);
-    const oidcUser = req.oidc.user || {};
-    return res.json({
-      user: {
-        email: oidcUser.email || '',
-        name: oidcUser.name || oidcUser.nickname || '',
-        fullName: oidcUser.name || oidcUser.nickname || '',
-        plan: 'Free',
-      },
-      degraded: true,
-      syncError: {
-        message: error.message,
-        code: error.code || 'SYNC_ERROR',
-      },
-    });
-  }
+  return res.json(payload);
 });
 
-router.patch('/me', requireAuth, async (req, res) => {
+router.patch('/me', requireSessionAuth, async (req, res) => {
   const nextName = String(req.body?.name || req.body?.fullName || '').trim();
 
   if (!nextName) {

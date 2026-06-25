@@ -3960,3 +3960,59 @@ h1, h2, h3, h4, h5, h6 {
   color: #f87171;
 }
 
+.api-key-reveal {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.api-key-reveal-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.api-key-reveal-value {
+  display: block;
+  word-break: break-all;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  padding: 10px 12px;
+  background: var(--surface-muted);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.api-example-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.api-example-tab {
+  border: 1px solid var(--card-border);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.api-example-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground, #fff);
+}
+
+.settings-action-btn.danger {
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+

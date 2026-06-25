@@ -124,13 +124,28 @@ This project uses the [Auth0 Express SDK](https://github.com/auth0/express-openi
 - `GET /logout` — end session; Auth0 `returnTo` is always `FRONTEND_URL` (dashboard, not the API host)
 - `GET /callback` — Auth0 OAuth callback (automatic)
 
-### Protected API routes (session cookie)
+### Protected API routes (session cookie or API key)
 
-- `GET /api/auth/me` — current user profile
-- `PATCH /api/auth/me` — update display name
+**Dashboard:** session cookie after `GET /login`  
+**Bots/scripts:** `Authorization: Bearer lk_live_...` (generate in dashboard → API tab)
+
+- `GET /api/auth/me` — current user profile (session or Bearer)
+- `PATCH /api/auth/me` — update display name (session only)
+- `GET /api/auth/api-key` — API key metadata (session only)
+- `POST /api/auth/api-key` — generate key, shown once (session only; replaces existing key)
+- `DELETE /api/auth/api-key` — revoke key (session only)
 - `GET /api/urls`, `POST /api/urls`, `GET /api/urls/:id`, `DELETE /api/urls/:id`
 - `POST /api/shorten` — alias for `POST /api/urls`
 - `GET /api/analytics/summary`, `GET /api/analytics/links/:urlId`
+
+Example (Telegram/Discord bot or curl):
+
+```bash
+curl -X POST https://app.drovashop.com/api/urls \
+  -H "Authorization: Bearer lk_live_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'
+```
 
 Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`, `GET /api/docs`
 
@@ -141,7 +156,7 @@ Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`, `GE
 3. **CORS** — `ALLOWED_DASHBOARD_ORIGINS` includes the React app origin(s).
 4. **Frontend build** — `VITE_API_URL` = API host (`https://app.drovashop.com`).
 5. **Short links** — `SHORT_LINK_BASE_URL` = public link domain; `SHORT_LINK_PATH` = `/go` or empty for root-level codes.
-6. **Verify** — `GET /api/status` shows `dbReady: true`; open `/api/docs` and test after logging in via `/login`.
+6. **Verify** — `GET /api/status` shows `dbReady: true`; generate an API key in dashboard → API tab for bots.
 
 🎯 Roadmap
 
@@ -150,6 +165,7 @@ Public routes: `GET /go/:code`, `GET /api/resolve/:code`, `GET /api/status`, `GE
 - [x] Click analytics
 - [x] User authentication (Auth0 email/password)
 - [x] Dashboard for link management
+- [x] Per-user API keys for bots (Telegram, Discord, scripts)
 - [ ] Link expiration support
 - [ ] Rate limiting and abuse protection
 

@@ -15,6 +15,7 @@ const {
 const Url = require('./models/Url');
 const { recordClick } = require('./services/clickTracking');
 const authRoutes = require('./routes/auth');
+const apiKeyRoutes = require('./routes/apiKeys');
 const urlsRoutes = require('./routes/urls');
 const analyticsRoutes = require('./routes/analytics');
 const { requireAuth } = require('./middleware/auth');
@@ -193,6 +194,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(getSwaggerSpec(), {
 }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/api-key', apiKeyRoutes);
 app.use('/api/urls', urlsRoutes);
 app.post('/api/shorten', requireAuth, urlsRoutes.handleShorten);
 app.use('/api/analytics', analyticsRoutes);

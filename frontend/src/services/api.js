@@ -118,3 +118,23 @@ export async function updateCurrentUserName(name) {
   });
   return readJson(response);
 }
+
+export async function fetchApiKey() {
+  const response = await apiFetch('/api/auth/api-key');
+  return readJson(response);
+}
+
+export async function createApiKey(name = 'Default') {
+  const response = await apiFetch('/api/auth/api-key', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  return readJson(response);
+}
+
+export async function revokeApiKey() {
+  const response = await apiFetch('/api/auth/api-key', {
+    method: 'DELETE',
+  });
+  return readJson(response);
+}

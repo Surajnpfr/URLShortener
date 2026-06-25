@@ -1,6 +1,8 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 
 const apiBaseUrl = process.env.BASE_URL || 'http://localhost:5000';
+const dualAuth = [{ bearerAuth: [] }, { cookieAuth: [] }];
+const sessionOnly = [{ cookieAuth: [] }];
 
 const options = {
   definition: {
@@ -9,11 +11,11 @@ const options = {
       title: 'Linkly URL Shortener API',
       version: '1.0.0',
       description: [
-        'Personal URL shortener API with Auth0 session authentication.',
+        'Personal URL shortener API with Auth0 session authentication and per-user API keys.',
         '',
-        '**Authentication:** This API uses **session cookies**, not JWT Bearer tokens.',
-        'Log in via `GET /login` in your browser, then call protected endpoints with the session cookie.',
-        'For Swagger UI, open `/login` in the same browser first, then return to `/api/docs`.',
+        '**Dashboard auth:** Session cookie via `GET /login` in your browser.',
+        '**Bot/script auth:** `Authorization: Bearer lk_live_...` API key from the dashboard API tab.',
+        'Generate keys with `POST /api/auth/api-key` (session only). Keys are shown once.',
       ].join('\n'),
     },
     servers: [
@@ -26,6 +28,12 @@ const options = {
           in: 'cookie',
           name: 'appSession',
           description: 'Auth0 session cookie set after login via GET /login',
+        },
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'API key',
+          description: 'Per-user API key (lk_live_...) from POST /api/auth/api-key',
         },
       },
       schemas: {
@@ -63,12 +71,22 @@ const options = {
         },
         CreateUrlRequest: {
           type: 'object',
-          required: ['url'],
           properties: {
             url: { type: 'string', example: 'https://example.com' },
+            originalUrl: { type: 'string', example: 'https://example.com', description: 'Alias for url' },
             customAlias: { type: 'string', example: 'my-link' },
             redirectType: { type: 'integer', example: 302 },
             shortCodeLength: { type: 'integer', example: 6 },
+          },
+        },
+        ApiKeyMetadata: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            prefix: { type: 'string', example: 'lk_live_ab12cd34' },
+            createdAt: { type: 'string', format: 'date-time' },
+            lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
           },
         },
         AnalyticsSummary: {
@@ -107,11 +125,77 @@ const options = {
           },
         },
       },
+      '/api/auth/api-key': {
+        get: {
+          tags: ['Auth'],
+          summary: 'Get current API key metadata (session only)',
+          security: sessionOnly,
+          responses: {
+            200: {
+              description: 'API key status',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      hasKey: { type: 'boolean' },
+                      apiKey: { $ref: '#/components/schemas/ApiKeyMetadata', nullable: true },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: 'Unauthorized' },
+          },
+        },
+        post: {
+          tags: ['Auth'],
+          summary: 'Generate API key (replaces existing; session only)',
+          security: sessionOnly,
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: { name: { type: 'string', example: 'Telegram Bot' } },
+                },
+              },
+            },
+          },
+          responses: {
+            201: {
+              description: 'API key created — plain key shown once',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      key: { type: 'string' },
+                      apiKey: { $ref: '#/components/schemas/ApiKeyMetadata' },
+                      message: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            401: { description: 'Unauthorized' },
+          },
+        },
+        delete: {
+          tags: ['Auth'],
+          summary: 'Revoke current API key (session only)',
+          security: sessionOnly,
+          responses: {
+            200: { description: 'Revoked' },
+            401: { description: 'Unauthorized' },
+          },
+        },
+      },
       '/api/auth/me': {
         get: {
           tags: ['Auth'],
           summary: 'Get current user profile',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           responses: {
             200: {
               description: 'User profile',
@@ -130,7 +214,7 @@ const options = {
         patch: {
           tags: ['Auth'],
           summary: 'Update display name',
-          security: [{ cookieAuth: [] }],
+          security: sessionOnly,
           requestBody: {
             required: true,
             content: {
@@ -154,7 +238,7 @@ const options = {
         get: {
           tags: ['URLs'],
           summary: 'List current user URLs',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           responses: {
             200: {
               description: 'Array of URL items',
@@ -171,7 +255,7 @@ const options = {
         post: {
           tags: ['URLs'],
           summary: 'Create a shortened URL',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           requestBody: {
             required: true,
             content: {
@@ -195,7 +279,7 @@ const options = {
         get: {
           tags: ['URLs'],
           summary: 'Get URL details by ID',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
             200: { description: 'URL item', content: { 'application/json': { schema: { $ref: '#/components/schemas/UrlItem' } } } },
@@ -206,7 +290,7 @@ const options = {
         delete: {
           tags: ['URLs'],
           summary: 'Delete a URL',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
             200: { description: 'Deleted' },
@@ -219,7 +303,7 @@ const options = {
         post: {
           tags: ['URLs'],
           summary: 'Create shortened URL (alias of POST /api/urls)',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           requestBody: {
             required: true,
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateUrlRequest' } } },
@@ -231,7 +315,7 @@ const options = {
         get: {
           tags: ['Analytics'],
           summary: 'Dashboard analytics summary',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           parameters: [
             { name: 'range', in: 'query', schema: { type: 'string', enum: ['7d', '30d', '90d', 'all'], default: '7d' } },
           ],
@@ -248,7 +332,7 @@ const options = {
         get: {
           tags: ['Analytics'],
           summary: 'Per-link analytics',
-          security: [{ cookieAuth: [] }],
+          security: dualAuth,
           parameters: [
             { name: 'urlId', in: 'path', required: true, schema: { type: 'string' } },
             { name: 'range', in: 'query', schema: { type: 'string', default: '30d' } },

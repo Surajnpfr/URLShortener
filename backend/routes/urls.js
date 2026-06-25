@@ -30,9 +30,10 @@ function formatUrlItem(req, item) {
 }
 
 async function handleShorten(req, res) {
-  const { url, customAlias, redirectType, shortCodeLength } = req.body;
+  const { url, originalUrl, customAlias, redirectType, shortCodeLength } = req.body;
+  const targetInput = url || originalUrl;
 
-  const validation = validateAndNormalizeUrl(url);
+  const validation = validateAndNormalizeUrl(targetInput);
   if (!validation.ok) {
     return res.status(400).json({ error: validation.error });
   }
