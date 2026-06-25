@@ -50,6 +50,15 @@ function getAllowedDashboardOrigins() {
   return parseOrigins(process.env.ALLOWED_DASHBOARD_ORIGINS);
 }
 
+function getDashboardUrl() {
+  if (process.env.HOLDING_PAGE_DASHBOARD_URL) {
+    return trimTrailingSlash(process.env.HOLDING_PAGE_DASHBOARD_URL);
+  }
+
+  const frontend = process.env.FRONTEND_URL || process.env.SHORT_LINK_BASE_URL || 'http://localhost:5173';
+  return `${trimTrailingSlash(frontend)}/dashboard`;
+}
+
 function getShortenerApiBaseUrl(req) {
   return (
     process.env.SHORTENER_API_URL ||
@@ -63,6 +72,7 @@ module.exports = {
   buildShortUrl,
   getAllowedDashboardOrigins,
   getAllowedHoldingOrigins,
+  getDashboardUrl,
   getHoldingPageUrl,
   getShortLinkBaseUrl,
   getShortLinkPath,

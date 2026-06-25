@@ -8,6 +8,7 @@ const {
   buildShortUrl,
   getAllowedDashboardOrigins,
   getAllowedHoldingOrigins,
+  getDashboardUrl,
   getHoldingPageUrl,
   getShortLinkBaseUrl,
 } = require('./config/env');
@@ -103,13 +104,14 @@ if (auth0Middleware) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-function renderNotFoundPage(baseUrl) {
+function renderNotFoundPage(dashboardUrl) {
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Link Not Found</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="refresh" content="5;url=${dashboardUrl}">
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0b0f19; color: #f3f4f6; text-align: center; padding: 50px 20px; }
         .card { max-width: 500px; margin: 0 auto; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 40px; border-radius: 16px; backdrop-filter: blur(10px); }
@@ -123,7 +125,8 @@ function renderNotFoundPage(baseUrl) {
       <div class="card">
         <h1>404 - Link Not Found</h1>
         <p>The shortened link you are trying to access does not exist or has expired.</p>
-        <a href="${baseUrl}">Go to URL Shortener</a>
+        <p>You will be redirected to the dashboard in a few seconds.</p>
+        <a href="${dashboardUrl}">Go to Dashboard</a>
       </div>
     </body>
     </html>
@@ -133,8 +136,8 @@ function renderNotFoundPage(baseUrl) {
 async function handleShortCodeRedirect(req, res, shortCode) {
   const urlDoc = await Url.findOne({ shortCode });
   if (!urlDoc) {
-    const baseUrl = getShortLinkBaseUrl(req);
-    return res.status(404).send(renderNotFoundPage(baseUrl));
+    const dashboardUrl = getDashboardUrl();
+    return res.status(404).send(renderNotFoundPage(dashboardUrl));
   }
 
   try {
